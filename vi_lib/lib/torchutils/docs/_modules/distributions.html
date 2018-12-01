@@ -1,0 +1,447 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>distributions &mdash; fk_torchutils  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> fk_torchutils
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">TorchUtils</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../low_rank.html">Fast Operations with Low-Rank + Diagonal Matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../distributions.html">Distributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fastpca.html">Fast Randomized PCA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../curvfuncs.html">Curvature Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../params.html">Parameter Utilities</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">fk_torchutils</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="index.html">Module code</a> &raquo;</li>
+        
+      <li>distributions</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for distributions</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Additional Probability Distributions</span>
+
+<span class="sd">Additional distributions are not derived from the Torch Distribution</span>
+<span class="sd">class due to the way Torch is handling the KL divergence.</span>
+
+<span class="sd">In Torch, KL divergence needs to be registered using a decorator and is then</span>
+<span class="sd">stored in the imported torch instance.</span>
+<span class="sd">To add distributions using an external library would mean we have to</span>
+<span class="sd">either export the torch instance that has been extended or have a function</span>
+<span class="sd">that takes a torch instance and modifies it.</span>
+
+<span class="sd">To avoid too much dependence between torchutils and torch, torchutils</span>
+<span class="sd">distributions have a kl method such that computes :math:`KL(p||q)` as </span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    p = Distr(...)</span>
+<span class="sd">    q = Distr(...)</span>
+<span class="sd">    p.kl(q)</span>
+
+<span class="sd">The :code:`kl` is only implemented between Torchutils distributions.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torchutils.low_rank</span> <span class="k">as</span> <span class="nn">lr</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;LowRankMultivariateNormal&quot;</span><span class="p">,</span> <span class="s2">&quot;MeanFieldMultivariateNormal&quot;</span>
+<span class="p">]</span>
+
+<span class="k">def</span> <span class="nf">trace_mult</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Trace of :math:`AB`&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">A</span> <span class="o">*</span> <span class="n">B</span><span class="o">.</span><span class="n">t</span><span class="p">())</span>
+
+<span class="k">def</span> <span class="nf">trace_square</span><span class="p">(</span><span class="n">A</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Trace of :math:`A A^\top` (equal to the trace of :math:`A^\top A`)&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">A</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">TorchUtilsDistribution</span><span class="p">():</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Base class for additional probability distribution&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">rsample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_samples</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns samples from the distribution as a :math:`[D, n_\text{samples}]` Tensor</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="nf">kl</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;:code:`p.kl(q)` computes the KL-divergence :math:`KL(p||q)`&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="nf">mean</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the mean of the distribution&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+<span class="k">class</span> <span class="nc">MultivariateNormal</span><span class="p">(</span><span class="n">TorchUtilsDistribution</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Base class for Multivariate Normal distributions.</span>
+
+<span class="sd">    Contains some private methods shared by Multivariate Normal distributions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_prec_diag</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the diagonal of the (computed) precision matrix&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+        
+    <span class="k">def</span> <span class="nf">_prec_mult</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">v</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Left-multiplies v by the precision matrix&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="nf">_logdet_cov</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Log-Determinant of the covariance matrix&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="nf">_base_kl</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">):</span>
+        <span class="n">diff_mu</span> <span class="o">=</span> <span class="n">q</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+        <span class="n">diff_mu_projected</span> <span class="o">=</span> <span class="n">diff_mu</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">q</span><span class="o">.</span><span class="n">_prec_mult</span><span class="p">(</span><span class="n">diff_mu</span><span class="p">)</span>
+        <span class="n">diff_det</span> <span class="o">=</span> <span class="n">q</span><span class="o">.</span><span class="n">_logdet_cov</span><span class="p">()</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">_logdet_cov</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">diff_mu_projected</span> <span class="o">+</span> <span class="n">diff_det</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
+
+<div class="viewcode-block" id="LowRankMultivariateNormal"><a class="viewcode-back" href="../distributions.html#distributions.LowRankMultivariateNormal">[docs]</a><span class="k">class</span> <span class="nc">LowRankMultivariateNormal</span><span class="p">(</span><span class="n">MultivariateNormal</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Creates a normal distribution a low-rank + diagonal covariance matrix</span>
+<span class="sd">    parameterized by ``cov_factor`` and ``cov_diag``::</span>
+
+<span class="sd">        covariance_matrix = cov_factor @ cov_factor.T + cov_diag</span>
+
+<span class="sd">    or ``prec_factor`` and ``prec_diag``::</span>
+
+<span class="sd">        covariance_matrix = (prec_factor @ prec_factor.T + prec_diag)^-1</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        Create a normal distribution with</span>
+<span class="sd">        `mean=[0,0], cov_factor=[1,0], cov_diag=[1,1]`</span>
+
+<span class="sd">        &gt;&gt;&gt; mean = torch.zeros(2, 1)</span>
+<span class="sd">        &gt;&gt;&gt; U = torch.tensor([[1], [0]])</span>
+<span class="sd">        &gt;&gt;&gt; diag = torch.tensor([1, 1])</span>
+<span class="sd">        &gt;&gt;&gt; m = MultivariateNormal(mean, cov_factor=U, cov_diag=diag)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        loc (Tensor): mean of the distribution with shape `d, 1`</span>
+<span class="sd">        cov_factor (Tensor): *factor* part of low-rank form of *covariance*</span>
+<span class="sd">            matrix with shape :math:`[D, K]`</span>
+<span class="sd">        cov_diag (Tensor): *diagonal* part of low-rank form of *covariance*</span>
+<span class="sd">            matrix with shape :math:`[D, 1]`</span>
+<span class="sd">        prec_factor (Tensor): *factor* part of low-rank form of *precision*</span>
+<span class="sd">            matrix with shape :math:`[D, K]`</span>
+<span class="sd">        prec_diag (Tensor): *diagonal* part of low-rank form of *precision*</span>
+<span class="sd">            matrix with shape :math:`[D, 1]`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loc</span><span class="p">,</span> <span class="n">cov_factor</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cov_diag</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prec_factor</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prec_diag</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span> <span class="o">=</span> <span class="p">(</span><span class="n">cov_factor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">cov_diag</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loc</span> <span class="o">=</span> <span class="n">loc</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">loc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">cov_factor</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">assert</span> <span class="n">loc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">cov_diag</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">assert</span> <span class="n">cov_diag</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">cov_factor</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">k</span> <span class="o">=</span> <span class="n">cov_factor</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">loc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">prec_factor</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">assert</span> <span class="n">loc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">prec_diag</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">assert</span> <span class="n">prec_diag</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">prec_factor</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">k</span> <span class="o">=</span> <span class="n">prec_factor</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">d</span> <span class="o">=</span> <span class="n">loc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cov_factor</span> <span class="o">=</span> <span class="n">cov_factor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cov_diag</span> <span class="o">=</span> <span class="n">cov_diag</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prec_factor</span> <span class="o">=</span> <span class="n">prec_factor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prec_diag</span> <span class="o">=</span> <span class="n">prec_diag</span>
+
+<div class="viewcode-block" id="LowRankMultivariateNormal.rsample"><a class="viewcode-back" href="../distributions.html#distributions.LowRankMultivariateNormal.rsample">[docs]</a>    <span class="k">def</span> <span class="nf">rsample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_samples</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">eps</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">d</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">loc</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">loc</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="n">eps_k</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">k</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">loc</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">loc</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">loc</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">cov_factor</span> <span class="o">@</span> <span class="n">eps_k</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">cov_diag</span><span class="o">.</span><span class="n">sqrt</span><span class="p">()</span> <span class="o">*</span> <span class="n">eps</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">loc</span> <span class="o">+</span> <span class="n">lr</span><span class="o">.</span><span class="n">invFactMult</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prec_factor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">prec_diag</span><span class="p">,</span> <span class="n">eps</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="LowRankMultivariateNormal.mean"><a class="viewcode-back" href="../distributions.html#distributions.LowRankMultivariateNormal.mean">[docs]</a>    <span class="k">def</span> <span class="nf">mean</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">loc</span></div>
+
+<div class="viewcode-block" id="LowRankMultivariateNormal.kl"><a class="viewcode-back" href="../distributions.html#distributions.LowRankMultivariateNormal.kl">[docs]</a>    <span class="k">def</span> <span class="nf">kl</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">):</span>
+        <span class="n">base_kl</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">_base_kl</span><span class="p">(</span><span class="n">q</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="n">base_kl</span> <span class="o">+=</span> <span class="n">trace_mult</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">cov_factor</span><span class="o">.</span><span class="n">t</span><span class="p">(),</span> <span class="n">q</span><span class="o">.</span><span class="n">_prec_mult</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">cov_factor</span><span class="p">))</span>
+            <span class="n">base_kl</span> <span class="o">+=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">_prec_diag</span><span class="p">()</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">cov_diag</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">lr</span><span class="o">.</span><span class="n">invFacts</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">prec_factor</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">prec_diag</span><span class="p">)</span>
+            <span class="n">base_kl</span> <span class="o">+=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">_prec_diag</span><span class="p">()</span> <span class="o">*</span> <span class="n">v</span><span class="p">)</span>
+            <span class="n">base_kl</span> <span class="o">-=</span> <span class="n">trace_mult</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">_prec_mult</span><span class="p">(</span><span class="n">A</span><span class="p">),</span> <span class="n">B</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">base_kl</span><span class="o">/</span><span class="mi">2</span></div>
+
+    <span class="c1"># UTILITIES FOR KL</span>
+
+<div class="viewcode-block" id="LowRankMultivariateNormal._prec_mult"><a class="viewcode-back" href="../distributions.html#distributions.LowRankMultivariateNormal._prec_mult">[docs]</a>    <span class="k">def</span> <span class="nf">_prec_mult</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">v</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">lr</span><span class="o">.</span><span class="n">invMult</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cov_factor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cov_diag</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">lr</span><span class="o">.</span><span class="n">mult</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prec_factor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">prec_diag</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="LowRankMultivariateNormal._prec_diag"><a class="viewcode-back" href="../distributions.html#distributions.LowRankMultivariateNormal._prec_diag">[docs]</a>    <span class="k">def</span> <span class="nf">_prec_diag</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">lr</span><span class="o">.</span><span class="n">invDiag</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cov_factor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cov_diag</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">lr</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prec_factor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">prec_diag</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="LowRankMultivariateNormal._logdet_cov"><a class="viewcode-back" href="../distributions.html#distributions.LowRankMultivariateNormal._logdet_cov">[docs]</a>    <span class="k">def</span> <span class="nf">_logdet_cov</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">lr</span><span class="o">.</span><span class="n">logdet</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cov_factor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cov_diag</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="o">-</span> <span class="n">lr</span><span class="o">.</span><span class="n">logdet</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prec_factor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">prec_diag</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="MeanFieldMultivariateNormal"><a class="viewcode-back" href="../distributions.html#distributions.MeanFieldMultivariateNormal">[docs]</a><span class="k">class</span> <span class="nc">MeanFieldMultivariateNormal</span><span class="p">(</span><span class="n">MultivariateNormal</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Creates a normal distribution with a diagonal covariance matrix</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        loc (Tensor): mean of the distribution with shape `d, 1`</span>
+<span class="sd">        cov_diag (Tensor): *diagonal* of the *covariance*</span>
+<span class="sd">            matrix with shape :math:`[D, 1]`</span>
+<span class="sd">        prec_diag (Tensor): *diagonal* of the *precision*</span>
+<span class="sd">            matrix with shape :math:`[D, 1]`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loc</span><span class="p">,</span> <span class="n">cov_diag</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prec_diag</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span> <span class="o">=</span> <span class="n">cov_diag</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loc</span> <span class="o">=</span> <span class="n">loc</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">loc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">cov_diag</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">assert</span> <span class="n">cov_diag</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">loc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">prec_diag</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">assert</span> <span class="n">prec_diag</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">d</span> <span class="o">=</span> <span class="n">loc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cov_diag</span> <span class="o">=</span> <span class="n">cov_diag</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prec_diag</span> <span class="o">=</span> <span class="n">prec_diag</span>
+
+<div class="viewcode-block" id="MeanFieldMultivariateNormal.rsample"><a class="viewcode-back" href="../distributions.html#distributions.MeanFieldMultivariateNormal.rsample">[docs]</a>    <span class="k">def</span> <span class="nf">rsample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_samples</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">eps</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">d</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">loc</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">loc</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">loc</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">cov_diag</span><span class="o">.</span><span class="n">sqrt</span><span class="p">()</span> <span class="o">*</span> <span class="n">eps</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">loc</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">eps</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">prec_diag</span><span class="o">.</span><span class="n">sqrt</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="MeanFieldMultivariateNormal.mean"><a class="viewcode-back" href="../distributions.html#distributions.MeanFieldMultivariateNormal.mean">[docs]</a>    <span class="k">def</span> <span class="nf">mean</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">loc</span></div>
+
+<div class="viewcode-block" id="MeanFieldMultivariateNormal.kl"><a class="viewcode-back" href="../distributions.html#distributions.MeanFieldMultivariateNormal.kl">[docs]</a>    <span class="k">def</span> <span class="nf">kl</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">):</span>
+        <span class="n">base_kl</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">_base_kl</span><span class="p">(</span><span class="n">q</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="n">base_kl</span> <span class="o">+=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">_prec_diag</span><span class="p">()</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">cov_diag</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="n">base_kl</span> <span class="o">+=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">_prec_diag</span><span class="p">()</span> <span class="o">/</span> <span class="n">p</span><span class="o">.</span><span class="n">prec_diag</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">base_kl</span><span class="o">/</span><span class="mi">2</span></div>
+
+    <span class="c1"># UTILITIES FOR KL</span>
+
+<div class="viewcode-block" id="MeanFieldMultivariateNormal._prec_mult"><a class="viewcode-back" href="../distributions.html#distributions.MeanFieldMultivariateNormal._prec_mult">[docs]</a>    <span class="k">def</span> <span class="nf">_prec_mult</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">v</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">v</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">cov_diag</span>
+        <span class="k">return</span> <span class="n">v</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">prec_diag</span></div>
+
+<div class="viewcode-block" id="MeanFieldMultivariateNormal._prec_diag"><a class="viewcode-back" href="../distributions.html#distributions.MeanFieldMultivariateNormal._prec_diag">[docs]</a>    <span class="k">def</span> <span class="nf">_prec_diag</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">1</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">cov_diag</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">prec_diag</span></div>
+
+<div class="viewcode-block" id="MeanFieldMultivariateNormal._logdet_cov"><a class="viewcode-back" href="../distributions.html#distributions.MeanFieldMultivariateNormal._logdet_cov">[docs]</a>    <span class="k">def</span> <span class="nf">_logdet_cov</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_cov</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cov_diag</span><span class="p">))</span>
+        <span class="k">return</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prec_diag</span><span class="p">))</span></div></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

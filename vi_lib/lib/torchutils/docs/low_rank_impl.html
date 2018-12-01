@@ -1,0 +1,372 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Implementation Details &mdash; fk_torchutils  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Distributions" href="distributions.html" />
+    <link rel="prev" title="Fast Operations with Low-Rank + Diagonal Matrices" href="low_rank.html" /> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> fk_torchutils
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="index.html">TorchUtils</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="low_rank.html">Fast Operations with Low-Rank + Diagonal Matrices</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Implementation Details</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#multiplication">Multiplication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#inversion">Inversion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#factorization-helper">Factorization Helper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#symmetric-factorization">Symmetric Factorization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#inverse-symmetric-factorization">Inverse Symmetric Factorization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#determinant">Determinant</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#trace">Trace</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="distributions.html">Distributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fastpca.html">Fast Randomized PCA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="curvfuncs.html">Curvature Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="params.html">Parameter Utilities</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">fk_torchutils</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="low_rank.html">Fast Operations with Low-Rank + Diagonal Matrices</a> &raquo;</li>
+        
+      <li>Implementation Details</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/low_rank_impl.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="implementation-details">
+<h1>Implementation Details<a class="headerlink" href="#implementation-details" title="Permalink to this headline">¶</a></h1>
+<p>Implementation details for the <code class="docutils literal notranslate"><span class="pre">torchutils.low_rank</span></code> module (<a class="reference external" href="low_rank.html">API</a>).</p>
+<p>If a matrix <span class="math notranslate nohighlight">\(A\)</span> can be expressed as the sum of a low-rank matrix <span class="math notranslate nohighlight">\(UU^\top\)</span>, where <span class="math notranslate nohighlight">\(U\)</span> is a <span class="math notranslate nohighlight">\([n \times k]\)</span> matrix, <span class="math notranslate nohighlight">\(k \ll n\)</span>, and a diagonal <span class="math notranslate nohighlight">\([n \times n]\)</span> matrix <span class="math notranslate nohighlight">\(D\)</span>, <span class="math notranslate nohighlight">\(A = UU^\top + D\)</span>, it is more efficient to do operations involving <span class="math notranslate nohighlight">\(A\)</span> using <span class="math notranslate nohighlight">\(U, D\)</span> directly instead of first computing <span class="math notranslate nohighlight">\(A\)</span>.</p>
+<ul class="simple">
+<li>The memory requirements to store <span class="math notranslate nohighlight">\(A\)</span> is <span class="math notranslate nohighlight">\(O(n^2)\)</span>, compared to <span class="math notranslate nohighlight">\(O(nk)\)</span> for <span class="math notranslate nohighlight">\(U, D\)</span>.</li>
+<li>Most operations that require <span class="math notranslate nohighlight">\(O(n^3)\)</span> operations using <span class="math notranslate nohighlight">\(A\)</span> can be implemented in <span class="math notranslate nohighlight">\(O(nk^2)\)</span> ops. using <span class="math notranslate nohighlight">\(U, D\)</span>.</li>
+</ul>
+<p>The goal of this library is to make it possible to compute operations involving <span class="math notranslate nohighlight">\(A\)</span> without forming a <span class="math notranslate nohighlight">\([n \times n]\)</span> matrix.
+This page gives some pointers to the maths used to implement.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">It is assumed that <span class="math notranslate nohighlight">\(D\)</span> is positive definite, i.e., contain only positive entries.</p>
+</div>
+<table border="1" class="docutils">
+<colgroup>
+<col width="40%" />
+<col width="60%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head" colspan="2">Content</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td><a class="reference internal" href="#multiplication">Multiplication</a></td>
+<td><span class="math notranslate nohighlight">\(Ax\)</span></td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#inversion">Inversion</a></td>
+<td><span class="math notranslate nohighlight">\(A^{-1}x\)</span></td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="#symmetric-factorization">Symmetric Factorization</a></td>
+<td><span class="math notranslate nohighlight">\(Bx\)</span>, where <span class="math notranslate nohighlight">\(BB^\top = A\)</span></td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#inverse-symmetric-factorization">Inverse Symmetric Factorization</a></td>
+<td><span class="math notranslate nohighlight">\(Cx\)</span>, where <span class="math notranslate nohighlight">\(CC^\top = A^{-1}\)</span></td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="#determinant">Determinant</a></td>
+<td><span class="math notranslate nohighlight">\(\det(A)\)</span></td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#trace">Trace</a></td>
+<td><span class="math notranslate nohighlight">\(\text{Tr}(A)\)</span></td>
+</tr>
+</tbody>
+</table>
+<p>The code examples below assume that <code class="docutils literal notranslate"><span class="pre">U</span></code> is a <code class="docutils literal notranslate"><span class="pre">[n</span> <span class="pre">x</span> <span class="pre">k]</span></code> and <code class="docutils literal notranslate"><span class="pre">d</span></code> is a <code class="docutils literal notranslate"><span class="pre">[n</span> <span class="pre">x</span> <span class="pre">1]</span></code> Torch.Tensor.</p>
+<div class="section" id="multiplication">
+<h2>Multiplication<a class="headerlink" href="#multiplication" title="Permalink to this headline">¶</a></h2>
+<p>Matrix multiplication only requires an ordering of operation that avoid creating a <span class="math notranslate nohighlight">\([n \times n]\)</span> matrix.
+The following ordering only uses the multiplication of <span class="math notranslate nohighlight">\([n \times k]\)</span> matrices with vectors.</p>
+<div class="math notranslate nohighlight">
+\[Ax = (UU^\top + D)x = U(U^\top x) + Dx\]</div>
+</div>
+<div class="section" id="inversion">
+<h2>Inversion<a class="headerlink" href="#inversion" title="Permalink to this headline">¶</a></h2>
+<p>Computing the inverse can be done using <a class="reference external" href="https://en.wikipedia.org/wiki/Woodbury_matrix_identity">Woodbury’s matrix identity</a>.
+Setting <span class="math notranslate nohighlight">\(V = D^{-1/2}U\)</span>,</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{array}{rcl}
+        A^{-1}x &amp;=&amp; (UU^\top + D)^{-1}x \\
+        &amp;=&amp; \left(D^{1/2}(VV^\top + I_n)D^{1/2}\right)^{-1}\\
+        &amp;=&amp; D^{1/2}(VV^\top + I_n)^{-1}D^{-1/2}\\
+        &amp;=&amp; D^{-1/2}(I_n - V(I_k + V^\top V)^{-1} V^\top) D^{-1/2} x
+\end{array}\end{split}\]</div>
+<p>Careful ordering to avoid matrix-matrix operations leads to an <span class="math notranslate nohighlight">\(O(nk^2)\)</span> implementation,</p>
+<div class="math notranslate nohighlight">
+\[A^{-1}x = D^{1/2}\left(\left(I_n - V(I_k + V^\top V\right)^{-1} \left(V^\top \left(D^{1/2} x\right)\right)\right).\]</div>
+</div>
+<div class="section" id="factorization-helper">
+<h2>Factorization Helper<a class="headerlink" href="#factorization-helper" title="Permalink to this headline">¶</a></h2>
+<p>For the factorization operations, it is useful to have a subroutine to compute factorizations for matrices of the form <span class="math notranslate nohighlight">\(I_n + VV^\top\)</span>, i.e., <span class="math notranslate nohighlight">\(W\)</span> such that <span class="math notranslate nohighlight">\(WW^\top = I_n + VV^\top\)</span>.
+This can be done by using Thm 3.1 from <a class="reference external" href="https://arxiv.org/abs/1405.0223">[AOS14]</a>, which yields a square-root for <span class="math notranslate nohighlight">\(I_n + VV^\top\)</span>, i.e., <span class="math notranslate nohighlight">\(W = W^\top\)</span>. Setting</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{array}{rcl}
+        L &amp;=&amp; \text{Cholesky}(V^\top V),\\
+        M &amp;=&amp; \text{Cholesky}(I_k + V^\top V),\\
+        K &amp;=&amp; L^{-\top}(M - I_k) L^{-1},\\
+        W &amp;=&amp; I_n + VKV^\top.
+\end{array}\end{split}\]</div>
+<p>Working with <span class="math notranslate nohighlight">\(W\)</span> directly is impractical, as it is of size <span class="math notranslate nohighlight">\([n \times n]\)</span>.
+The function <code class="docutils literal notranslate"><span class="pre">__factCore(V)</span></code> (<a class="reference external" href="_modules/low_rank.html#__factCore">Source</a>) returns the intermediate <span class="math notranslate nohighlight">\([k \times k]\)</span> matrix <span class="math notranslate nohighlight">\(K\)</span> instead.</p>
+</div>
+<div class="section" id="symmetric-factorization">
+<h2>Symmetric Factorization<a class="headerlink" href="#symmetric-factorization" title="Permalink to this headline">¶</a></h2>
+<p>Given a way to compute a factor <span class="math notranslate nohighlight">\(W\)</span> for <span class="math notranslate nohighlight">\(VV^\top + I_n\)</span>, we have that <span class="math notranslate nohighlight">\(B = D^{1/2} W\)</span> is a symmetric factorization of <span class="math notranslate nohighlight">\(A\)</span>;</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{array}{rcl}
+        A &amp;=&amp; (UU^\top + I_n),\\
+        &amp;=&amp; D^{1/2}(VV^\top + I_n)D^{1/2},\\
+        &amp;=&amp; D^{1/2}WW^\top D^{1/2}.
+\end{array}\end{split}\]</div>
+<p>We can compute <span class="math notranslate nohighlight">\(K = \texttt{__factCore}(V)\)</span> to get <span class="math notranslate nohighlight">\(W = I_n + VKV^\top\)</span>, and careful ordering to avoid matrix-matrix operations leads to an <span class="math notranslate nohighlight">\(O(nk^2)\)</span> implementation,</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{array}{rcl}
+        Bx &amp;=&amp; D^{1/2} W x,\\
+        &amp;=&amp; D^{1/2}(I_n + V K V^\top)x,\\
+        &amp;=&amp; D^{1/2}x + V \left(K \left(V^\top x\right)\right),\\
+\end{array}\end{split}\]</div>
+</div>
+<div class="section" id="inverse-symmetric-factorization">
+<h2>Inverse Symmetric Factorization<a class="headerlink" href="#inverse-symmetric-factorization" title="Permalink to this headline">¶</a></h2>
+<p>As above, but we now need a symmetric factorization for <span class="math notranslate nohighlight">\(CC^\top = A^{-1}\)</span>.
+This can be done by using <a class="reference external" href="https://en.wikipedia.org/wiki/Woodbury_matrix_identity">Woodbury’s matrix identity</a> to compute the inverse of <span class="math notranslate nohighlight">\(W\)</span>. Given that <span class="math notranslate nohighlight">\(W\)</span> is symmetric, we have that</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{array}{rcl}
+        A^{-1} &amp;=&amp; (UU^\top + I_n),\\
+        &amp;=&amp; D^{-1/2}(VV^\top + I_n)^{-1}D^{-1/2},\\
+        &amp;=&amp; D^{1/2}W^{-1}W^{-\top}D^{1/2}.
+\end{array}\end{split}\]</div>
+<p>Using Woodbury’s identity on <span class="math notranslate nohighlight">\(W\)</span> and ordering as to avoid matrix-matrix multiplication gives an <span class="math notranslate nohighlight">\(O(nk^2)\)</span> algorithm,</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{array}{rcl}
+        Cx &amp;=&amp; D^{1/2}W^{-1}x,\\
+        &amp;=&amp; D^{1/2}(I_n + V K V^\top)^{-1}x,\\
+        &amp;=&amp; D^{1/2}(I_n - V (K^{-1} + V^\top V)^{-1} V^\top)x,\\
+        &amp;=&amp; D^{1/2}x - V \left((K^{-1} + V^\top V)^{-1} \left(V^\top x\right)\right).\\
+\end{array}\end{split}\]</div>
+</div>
+<div class="section" id="determinant">
+<h2>Determinant<a class="headerlink" href="#determinant" title="Permalink to this headline">¶</a></h2>
+<p>Using the multiplicity of the determinant, we have that</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{array}{rcl}
+        \det(A) &amp;=&amp; \det(UU^\top + D),\\
+        &amp;=&amp; \det(D^{1/2}(VV^\top + I_n)D^{1/2}),\\
+        &amp;=&amp; \det(VV^\top + I_n)\det(D).\\
+\end{array}\end{split}\]</div>
+<p>Using <a class="reference external" href="https://en.wikipedia.org/wiki/Sylvester's_determinant_identity">Sylvester’s Determinant Identity</a>, we have that <span class="math notranslate nohighlight">\(\det(VV^\top + I_n) = \det(V^\top V + I_k)\)</span>.</p>
+<p>The determinant involves computing large products, <span class="math notranslate nohighlight">\(\det(D) = \prod_{i=1}^n D_{ii}\)</span>, which can be unstable if <span class="math notranslate nohighlight">\(n\)</span> is large. For stability, we return the log-determinant,</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{array}{rcl}
+        \log \det(A) &amp;=&amp; \det(VV^\top + I_n)\det(D),\\
+        &amp;=&amp; \log \det(V^\top V + I_k) + \sum_{i=1}^n D_{ii}.
+\end{array}\end{split}\]</div>
+</div>
+<div class="section" id="trace">
+<h2>Trace<a class="headerlink" href="#trace" title="Permalink to this headline">¶</a></h2>
+<p>The trace is not difficult to compute given <span class="math notranslate nohighlight">\(A\)</span>, as it is simply the sum of the elements on the diagonal - the challenge is in avoiding the computation of <span class="math notranslate nohighlight">\(A\)</span>.
+As</p>
+<div class="math notranslate nohighlight">
+\[(UU^\top)_{dd} = \sum_{i=1}^k (U)_{di} (U^\top)_{id} = \sum_{i=1}^k U_{di}^2,\]</div>
+<p>we can get the sum of the elements on the diagonal of <span class="math notranslate nohighlight">\(UU^T\)</span> by taking <code class="docutils literal notranslate"><span class="pre">torch.sum(U**2)</span></code>, leading to a simple</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">trace</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span> <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">U</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

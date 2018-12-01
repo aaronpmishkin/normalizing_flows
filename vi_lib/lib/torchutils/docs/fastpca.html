@@ -1,0 +1,311 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Fast Randomized PCA &mdash; fk_torchutils  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Curvature Functions" href="curvfuncs.html" />
+    <link rel="prev" title="Individual Gradient computations" href="models_individual_gradients.html" /> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> fk_torchutils
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="index.html">TorchUtils</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="low_rank.html">Fast Operations with Low-Rank + Diagonal Matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="distributions.html">Distributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Fast Randomized PCA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="curvfuncs.html">Curvature Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="params.html">Parameter Utilities</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">fk_torchutils</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Fast Randomized PCA</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/fastpca.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="fast-randomized-pca">
+<h1>Fast Randomized PCA<a class="headerlink" href="#fast-randomized-pca" title="Permalink to this headline">¶</a></h1>
+<p>This module provides a PyTorch implementation of fast randomized top-k eigendecomposition and borrows heavily from Facebook’s <code class="docutils literal notranslate"><span class="pre">fbpca</span></code> code (basically an incomplete port from Numpy to Pytorch).</p>
+<p>See their <a class="reference external" href="https://github.com/facebook/fbpca">Github</a> | <a class="reference external" href="http://fbpca.readthedocs.io/en/latest/">Doc</a> | <a class="reference external" href="https://research.fb.com/fast-randomized-svd/">Blog post</a>.</p>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="#fastpca.eigsh" title="fastpca.eigsh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fastpca.eigsh</span></code></a></td>
+<td>Top-k Eigendecomposition of a positive semi-definite matrix A.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="#fastpca.eigsh_func" title="fastpca.eigsh_func"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fastpca.eigsh_func</span></code></a></td>
+<td>Top-k Eigendecomposition of PSD linear operator <span class="math notranslate nohighlight">\(f(x) = Ax\)</span>.</td>
+</tr>
+</tbody>
+</table>
+<dl class="function">
+<dt id="fastpca.eigsh">
+<code class="descclassname">fastpca.</code><code class="descname">eigsh</code><span class="sig-paren">(</span><em>A=None</em>, <em>k=6</em>, <em>n_iter=4</em>, <em>L=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fastpca.html#eigsh"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fastpca.eigsh" title="Permalink to this definition">¶</a></dt>
+<dd><p>Top-k Eigendecomposition of a positive semi-definite matrix A.</p>
+<p>Returns a rank-k approximation of the positive definite matrix A.
+Parameters <code class="docutils literal notranslate"><span class="pre">n_iter</span></code> and <code class="docutils literal notranslate"><span class="pre">L</span></code> control the running time and quality of
+the approximation.
+The quality of the approximation degrades as <code class="docutils literal notranslate"><span class="pre">k</span></code> gets close to the size
+of <code class="docutils literal notranslate"><span class="pre">A</span></code>.
+<code class="docutils literal notranslate"><span class="pre">n_iter=1</span></code> should already be sufficient to obtain a good quality
+approximation, especially if <code class="docutils literal notranslate"><span class="pre">k</span></code> is small.
+More details in <a class="reference internal" href="#hmt09">HMT09</a>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>A</strong> (<em>Tensor</em>) – a positive semi-definite matrix.</li>
+<li><strong>k</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of eigenvalues/eigenvectors to return.
+Default: 6 Valid range: <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">&lt;=</span> <span class="pre">k</span> <span class="pre">&lt;=</span> <span class="pre">dim(A)</span></code></li>
+<li><strong>n_iter</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of iterations of the power methods.
+Default: 4 Valid range: <code class="docutils literal notranslate"><span class="pre">n_iter</span> <span class="pre">&gt;=</span> <span class="pre">0</span></code></li>
+<li><strong>L</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of random vector to start the decomposition
+Default: k+2 Valid range: <code class="docutils literal notranslate"><span class="pre">L</span> <span class="pre">&gt;=</span> <span class="pre">k</span></code></li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><p>A tuple containing</p>
+<blockquote>
+<div><ul class="simple">
+<li>e (Tensor): shape (k,1) containing the largest eigenvalues</li>
+<li>V (Tensor): shape (m,k) containing the matching eigenvectors</li>
+</ul>
+</div></blockquote>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">References</p>
+<table class="docutils citation" frame="void" id="hmt09" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label">[HMT09]</td><td>Nathan Halko, Per-Gunnar Martinsson, and Joel Tropp. 2009.
+Finding structure with randomness: probabilistic algorithms for
+constructing approximate matrix decompositions.
+(available at <a class="reference external" href="http://arxiv.org/abs/0909.4061">arXiv</a>).</td></tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="fastpca.eigsh_func">
+<code class="descclassname">fastpca.</code><code class="descname">eigsh_func</code><span class="sig-paren">(</span><em>f</em>, <em>dtype</em>, <em>device</em>, <em>n</em>, <em>k=6</em>, <em>n_iter=4</em>, <em>L=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fastpca.html#eigsh_func"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fastpca.eigsh_func" title="Permalink to this definition">¶</a></dt>
+<dd><p>Top-k Eigendecomposition of PSD linear operator <span class="math notranslate nohighlight">\(f(x) = Ax\)</span>.</p>
+<p>Provides a way to use <a class="reference internal" href="#fastpca.eigsh" title="fastpca.eigsh"><code class="xref py py-meth docutils literal notranslate"><span class="pre">fastpca.eigsh()</span></code></a> when the matrix
+to eigendecompose is only accessible through matrix-vector products.</p>
+<p>Might be useful if for the eigendecomposition of a matrix <span class="math notranslate nohighlight">\(A = UU^\top\)</span>,
+where <span class="math notranslate nohighlight">\(U\)</span> is a known matrix of size <span class="math notranslate nohighlight">\((n,m)\)</span>;
+computing <span class="math notranslate nohighlight">\(U(U^\top x)\)</span> costs <span class="math notranslate nohighlight">\(O(nm)\)</span> operations whereas
+computing <span class="math notranslate nohighlight">\(A\)</span> costs <span class="math notranslate nohighlight">\(O(n^2m)\)</span>.</p>
+<p>See <a class="reference internal" href="#fastpca.eigsh" title="fastpca.eigsh"><code class="xref py py-meth docutils literal notranslate"><span class="pre">fastpca.eigsh()</span></code></a> for a description of the other arguments.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>f</strong> (<em>function</em>) – Applies the linear operator to eigendecompose,
+<span class="math notranslate nohighlight">\(f(x) = Ax\)</span>.</li>
+<li><strong>dtype</strong> (<em>torch.dtype</em>) – The type used in <code class="docutils literal notranslate"><span class="pre">f</span></code>.</li>
+<li><strong>device</strong> (<em>torch.device</em>) – The device where <code class="docutils literal notranslate"><span class="pre">f</span></code> is allocated.</li>
+<li><strong>m</strong> (<em>int</em>) – The dimensionality of the domain of <code class="docutils literal notranslate"><span class="pre">f</span></code>.
+Would be <code class="docutils literal notranslate"><span class="pre">A.shape[1]</span></code> if <span class="math notranslate nohighlight">\(f(x) = Ax\)</span>.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

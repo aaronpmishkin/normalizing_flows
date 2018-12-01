@@ -1,0 +1,326 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>fastpca &mdash; fk_torchutils  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> fk_torchutils
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">TorchUtils</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../low_rank.html">Fast Operations with Low-Rank + Diagonal Matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../distributions.html">Distributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fastpca.html">Fast Randomized PCA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../curvfuncs.html">Curvature Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../params.html">Parameter Utilities</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">fk_torchutils</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="index.html">Module code</a> &raquo;</li>
+        
+      <li>fastpca</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for fastpca</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Fast computation of eigenvalue decomposition and PCA.</span>
+
+<span class="sd">Adapted from Facebook&#39;s Fast Randomized PCA/SVD;</span>
+<span class="sd">* `Github &lt;https://github.com/facebook/fbpca&gt;`_</span>
+<span class="sd">* `Doc &lt;http://fbpca.readthedocs.io/en/latest/&gt;`_</span>
+<span class="sd">* `Blog post &lt;https://research.fb.com/fast-randomized-svd/&gt;`_.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="c1"># Disable naming scheme error for math symbols (U, d, k, ...)</span>
+<span class="c1"># pylint: disable=C0103</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;eigsh_func&quot;</span><span class="p">,</span> <span class="s2">&quot;eigsh&quot;</span>
+<span class="p">]</span>
+
+<div class="viewcode-block" id="eigsh_func"><a class="viewcode-back" href="../fastpca.html#fastpca.eigsh_func">[docs]</a><span class="k">def</span> <span class="nf">eigsh_func</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">n_iter</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Top-k Eigendecomposition of PSD linear operator :math:`f(x) = Ax`.</span>
+
+<span class="sd">    Provides a way to use :meth:`fastpca.eigsh` when the matrix</span>
+<span class="sd">    to eigendecompose is only accessible through matrix-vector products.</span>
+
+<span class="sd">    Might be useful if for the eigendecomposition of a matrix :math:`A = UU^\top`,</span>
+<span class="sd">    where :math:`U` is a known matrix of size :math:`(n,m)`;</span>
+<span class="sd">    computing :math:`U(U^\top x)` costs :math:`O(nm)` operations whereas</span>
+<span class="sd">    computing :math:`A` costs :math:`O(n^2m)`.</span>
+
+<span class="sd">    See :meth:`fastpca.eigsh` for a description of the other arguments.</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        f (function): Applies the linear operator to eigendecompose,</span>
+<span class="sd">            :math:`f(x) = Ax`.</span>
+<span class="sd">        dtype (torch.dtype): The type used in ``f``.</span>
+<span class="sd">        device (torch.device): The device where ``f`` is allocated.</span>
+<span class="sd">        m (int): The dimensionality of the domain of ``f``.</span>
+<span class="sd">            Would be ``A.shape[1]`` if :math:`f(x) = Ax`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">L</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">L</span> <span class="o">=</span> <span class="n">k</span><span class="o">+</span><span class="mi">2</span>
+    <span class="k">assert</span> <span class="n">k</span> <span class="o">&gt;=</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="n">k</span> <span class="o">&lt;=</span> <span class="n">n</span>
+    <span class="k">assert</span> <span class="n">L</span> <span class="o">&gt;=</span> <span class="n">k</span>
+    <span class="k">assert</span> <span class="n">n_iter</span> <span class="o">&gt;=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">orthogonalize</span><span class="p">(</span><span class="n">A</span><span class="p">):</span>
+        <span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">qr</span><span class="p">(</span><span class="n">A</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Q</span>
+
+    <span class="k">def</span> <span class="nf">nystrom</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">anorm</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Use the Nystrom method to obtain approximations to the</span>
+<span class="sd">        eigenvalues and eigenvectors of A (shifting A on the subspace</span>
+<span class="sd">        spanned by the columns of Q in order to make the shifted A be</span>
+<span class="sd">        positive definite).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">anorm</span> <span class="o">=</span> <span class="o">.</span><span class="mf">1e-6</span> <span class="o">*</span> <span class="n">anorm</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">1.</span> <span class="o">*</span> <span class="n">n</span><span class="p">)</span>
+        <span class="n">E</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">Q</span><span class="p">)</span> <span class="o">+</span> <span class="n">anorm</span> <span class="o">*</span> <span class="n">Q</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">E</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="p">(</span><span class="n">R</span> <span class="o">+</span> <span class="n">R</span><span class="o">.</span><span class="n">t</span><span class="p">())</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">potrf</span><span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="c1"># Cholesky</span>
+        <span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">gesv</span><span class="p">(</span><span class="n">E</span><span class="o">.</span><span class="n">t</span><span class="p">(),</span> <span class="n">R</span><span class="p">)</span> <span class="c1"># Solve</span>
+        <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">V</span><span class="p">)</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">svd</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="n">some</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="c1"># SVD</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">d</span> <span class="o">*</span> <span class="n">d</span> <span class="o">-</span> <span class="n">anorm</span>
+        <span class="k">return</span> <span class="n">d</span><span class="p">,</span> <span class="n">V</span>
+
+    <span class="n">Q</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="n">L</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span><span class="o">-</span><span class="mf">0.5</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_iter</span><span class="o">-</span><span class="mi">1</span><span class="p">)):</span>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">orthogonalize</span><span class="p">(</span><span class="n">f</span><span class="p">(</span><span class="n">Q</span><span class="p">))</span>
+    <span class="n">oldQ</span> <span class="o">=</span> <span class="n">Q</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">Q</span><span class="p">)</span>
+    <span class="n">anorm</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">/</span><span class="n">torch</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">oldQ</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">orthogonalize</span><span class="p">(</span><span class="n">Q</span><span class="p">)</span>
+
+    <span class="n">d</span><span class="p">,</span> <span class="n">V</span> <span class="o">=</span> <span class="n">nystrom</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">anorm</span><span class="p">)</span>
+
+    <span class="c1"># Retain only the entries with the k greatest absolute values</span>
+    <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">d</span><span class="p">)</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">idx</span><span class="p">[(</span><span class="n">L</span><span class="o">-</span><span class="n">k</span><span class="p">):]</span>
+    <span class="k">return</span> <span class="nb">abs</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="n">idx</span><span class="p">]),</span> <span class="n">V</span><span class="p">[:,</span> <span class="n">idx</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="eigsh"><a class="viewcode-back" href="../fastpca.html#fastpca.eigsh">[docs]</a><span class="k">def</span> <span class="nf">eigsh</span><span class="p">(</span><span class="n">A</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">n_iter</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Top-k Eigendecomposition of a positive semi-definite matrix A.</span>
+
+<span class="sd">    Returns a rank-k approximation of the positive definite matrix A.</span>
+<span class="sd">    Parameters ``n_iter`` and ``L`` control the running time and quality of</span>
+<span class="sd">    the approximation.</span>
+<span class="sd">    The quality of the approximation degrades as ``k`` gets close to the size</span>
+<span class="sd">    of ``A``.</span>
+<span class="sd">    ``n_iter=1`` should already be sufficient to obtain a good quality</span>
+<span class="sd">    approximation, especially if ``k`` is small.</span>
+<span class="sd">    More details in HMT09_.</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        A (Tensor): a positive semi-definite matrix.</span>
+<span class="sd">        k (int, optional): Number of eigenvalues/eigenvectors to return.</span>
+<span class="sd">            Default: 6 Valid range: ``0 &lt;= k &lt;= dim(A)``</span>
+<span class="sd">        n_iter (int, optional): Number of iterations of the power methods.</span>
+<span class="sd">            Default: 4 Valid range: ``n_iter &gt;= 0``</span>
+<span class="sd">        L (int, optional): Number of random vector to start the decomposition</span>
+<span class="sd">            Default: k+2 Valid range: ``L &gt;= k``</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A tuple containing</span>
+
+<span class="sd">            * e (Tensor): shape (k,1) containing the largest eigenvalues</span>
+<span class="sd">            * V (Tensor): shape (m,k) containing the matching eigenvectors</span>
+
+<span class="sd">    References:</span>
+<span class="sd">        .. [HMT09] Nathan Halko, Per-Gunnar Martinsson, and Joel Tropp. 2009.</span>
+<span class="sd">            Finding structure with randomness: probabilistic algorithms for</span>
+<span class="sd">            constructing approximate matrix decompositions.</span>
+<span class="sd">            (available at `arXiv &lt;http://arxiv.org/abs/0909.4061&gt;`_).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">eigsh_func</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">A</span> <span class="o">@</span> <span class="n">x</span><span class="p">,</span> <span class="n">A</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">A</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">k</span><span class="o">=</span><span class="n">k</span><span class="p">,</span> <span class="n">n_iter</span><span class="o">=</span><span class="n">n_iter</span><span class="p">,</span> <span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

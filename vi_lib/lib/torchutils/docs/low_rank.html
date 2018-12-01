@@ -1,0 +1,372 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Fast Operations with Low-Rank + Diagonal Matrices &mdash; fk_torchutils  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Implementation Details" href="low_rank_impl.html" />
+    <link rel="prev" title="TorchUtils" href="index.html" /> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> fk_torchutils
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="index.html">TorchUtils</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Fast Operations with Low-Rank + Diagonal Matrices</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="low_rank_impl.html">Implementation Details</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="distributions.html">Distributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fastpca.html">Fast Randomized PCA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="curvfuncs.html">Curvature Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="params.html">Parameter Utilities</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">fk_torchutils</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Fast Operations with Low-Rank + Diagonal Matrices</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/low_rank.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="module-low_rank">
+<span id="fast-operations-with-low-rank-diagonal-matrices"></span><h1>Fast Operations with Low-Rank + Diagonal Matrices<a class="headerlink" href="#module-low_rank" title="Permalink to this headline">¶</a></h1>
+<p>Linear Algebra routines for Low-Rank + Diagonal Matrix operations</p>
+<p>This module implements operations involving a matrix <span class="math notranslate nohighlight">\(A\)</span> that can be written as
+<span class="math notranslate nohighlight">\(UU^\top + D\)</span>, where <span class="math notranslate nohighlight">\(U\)</span> is a low rank <span class="math notranslate nohighlight">\([n \times k]\)</span> matrix,
+<span class="math notranslate nohighlight">\(k \ll n\)</span>, and <span class="math notranslate nohighlight">\(D\)</span> is a diagonal <span class="math notranslate nohighlight">\([n \times n]\)</span> matrix.</p>
+<p>Those can be implemented more efficiently when working with <span class="math notranslate nohighlight">\(U, D\)</span> directly
+instead of computing <span class="math notranslate nohighlight">\(A\)</span>, especially if <span class="math notranslate nohighlight">\(n\)</span> is large
+and <span class="math notranslate nohighlight">\(A\)</span> might not fit into memory.</p>
+<p>The original goal was to implement operations to sample and update from gaussian distributions with low-rank + diagonal covariance/precision matrices, which has since been implemented in PyTorch (see this <a class="reference external" href="https://github.com/pytorch/pytorch/pull/8635">PR</a>).</p>
+<p>More background is available at the <a class="reference external" href="low_rank_impl.html">implementation details</a> page if you want to implement more operations.</p>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="#low_rank.mult" title="low_rank.mult"><code class="xref py py-obj docutils literal notranslate"><span class="pre">low_rank.mult</span></code></a>(U,&nbsp;d,&nbsp;x)</td>
+<td>Computes <span class="math notranslate nohighlight">\(Ax\)</span> where <span class="math notranslate nohighlight">\(A = UU^\top + diag(d)\)</span></td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="#low_rank.invMult" title="low_rank.invMult"><code class="xref py py-obj docutils literal notranslate"><span class="pre">low_rank.invMult</span></code></a>(U,&nbsp;d,&nbsp;x)</td>
+<td>Computes <span class="math notranslate nohighlight">\(A^{-1}x\)</span> where <span class="math notranslate nohighlight">\(A = UU^\top + diag(d)\)</span></td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#low_rank.factMult" title="low_rank.factMult"><code class="xref py py-obj docutils literal notranslate"><span class="pre">low_rank.factMult</span></code></a>(U,&nbsp;d,&nbsp;x)</td>
+<td>Computes <span class="math notranslate nohighlight">\(Bx\)</span> where <span class="math notranslate nohighlight">\(BB^\top = UU^\top + diag(d)\)</span></td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="#low_rank.invFactMult" title="low_rank.invFactMult"><code class="xref py py-obj docutils literal notranslate"><span class="pre">low_rank.invFactMult</span></code></a>(U,&nbsp;d,&nbsp;x)</td>
+<td>Computes <span class="math notranslate nohighlight">\(Cx\)</span> where <span class="math notranslate nohighlight">\(CC^\top = (UU^\top + diag(d))^{-1}\)</span></td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#low_rank.logdet" title="low_rank.logdet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">low_rank.logdet</span></code></a>(U,&nbsp;d)</td>
+<td>Computes <span class="math notranslate nohighlight">\(\det(A)\)</span> where <span class="math notranslate nohighlight">\(A = UU^\top + diag(d)\)</span></td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="#low_rank.trace" title="low_rank.trace"><code class="xref py py-obj docutils literal notranslate"><span class="pre">low_rank.trace</span></code></a>(U,&nbsp;d)</td>
+<td>Computes <span class="math notranslate nohighlight">\(\text{Trace}(A)\)</span> where <span class="math notranslate nohighlight">\(A = UU^\top + diag(d)\)</span></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">General
+The matrix <span class="math notranslate nohighlight">\(U\)</span> is assumed to be of size <span class="math notranslate nohighlight">\([n \times k]\)</span>, where <span class="math notranslate nohighlight">\(k \ll n\)</span>.</p>
+</div>
+<dl class="function">
+<dt id="low_rank.mult">
+<code class="descclassname">low_rank.</code><code class="descname">mult</code><span class="sig-paren">(</span><em>U</em>, <em>d</em>, <em>x</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/low_rank.html#mult"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#low_rank.mult" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes <span class="math notranslate nohighlight">\(Ax\)</span> where <span class="math notranslate nohighlight">\(A = UU^\top + diag(d)\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>U</strong> (<em>Tensor</em>) – a low-rank matrix of size [n x k]</li>
+<li><strong>d</strong> (<em>Tensor</em>) – a vector ([n x 1] Tensor) representing the diagonal</li>
+<li><strong>x</strong> (<em>Tensor</em>) – size [n x d]</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="low_rank.invMult">
+<code class="descclassname">low_rank.</code><code class="descname">invMult</code><span class="sig-paren">(</span><em>U</em>, <em>d</em>, <em>x</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/low_rank.html#invMult"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#low_rank.invMult" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes <span class="math notranslate nohighlight">\(A^{-1}x\)</span> where <span class="math notranslate nohighlight">\(A = UU^\top + diag(d)\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>U</strong> (<em>Tensor</em>) – a low-rank matrix of size [n x k]</li>
+<li><strong>d</strong> (<em>Tensor</em>) – a vector ([n x 1] Tensor) representing the diagonal</li>
+<li><strong>x</strong> (<em>Tensor</em>) – size [n x d]</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="low_rank.factMult">
+<code class="descclassname">low_rank.</code><code class="descname">factMult</code><span class="sig-paren">(</span><em>U</em>, <em>d</em>, <em>x</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/low_rank.html#factMult"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#low_rank.factMult" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes <span class="math notranslate nohighlight">\(Bx\)</span> where <span class="math notranslate nohighlight">\(BB^\top = UU^\top + diag(d)\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>U</strong> (<em>Tensor</em>) – a low-rank matrix of size [n x k]</li>
+<li><strong>d</strong> (<em>Tensor</em>) – a vector ([n x 1] Tensor) representing the diagonal</li>
+<li><strong>x</strong> (<em>Tensor</em>) – size [n x d]</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="low_rank.invFactMult">
+<code class="descclassname">low_rank.</code><code class="descname">invFactMult</code><span class="sig-paren">(</span><em>U</em>, <em>d</em>, <em>x</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/low_rank.html#invFactMult"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#low_rank.invFactMult" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes <span class="math notranslate nohighlight">\(Cx\)</span> where <span class="math notranslate nohighlight">\(CC^\top = (UU^\top + diag(d))^{-1}\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>U</strong> (<em>Tensor</em>) – a low-rank matrix of size [n x k]</li>
+<li><strong>d</strong> (<em>Tensor</em>) – a vector ([n x 1] Tensor) representing the diagonal</li>
+<li><strong>x</strong> (<em>Tensor</em>) – size [n x d]</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="low_rank.logdet">
+<code class="descclassname">low_rank.</code><code class="descname">logdet</code><span class="sig-paren">(</span><em>U</em>, <em>d</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/low_rank.html#logdet"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#low_rank.logdet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes <span class="math notranslate nohighlight">\(\det(A)\)</span> where <span class="math notranslate nohighlight">\(A = UU^\top + diag(d)\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>U</strong> (<em>Tensor</em>) – a low-rank matrix of size [n x k]</li>
+<li><strong>d</strong> (<em>Tensor</em>) – a vector ([n x 1] Tensor) representing the diagonal</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="low_rank.trace">
+<code class="descclassname">low_rank.</code><code class="descname">trace</code><span class="sig-paren">(</span><em>U</em>, <em>d</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/low_rank.html#trace"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#low_rank.trace" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes <span class="math notranslate nohighlight">\(\text{Trace}(A)\)</span> where <span class="math notranslate nohighlight">\(A = UU^\top + diag(d)\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>U</strong> (<em>Tensor</em>) – a low-rank matrix of size [n x k]</li>
+<li><strong>d</strong> (<em>Tensor</em>) – a vector ([n x 1] Tensor) representing the diagonal</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<div class="toctree-wrapper compound">
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

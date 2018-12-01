@@ -1,0 +1,344 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>curvfuncs &mdash; fk_torchutils  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> fk_torchutils
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">TorchUtils</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../low_rank.html">Fast Operations with Low-Rank + Diagonal Matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../distributions.html">Distributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fastpca.html">Fast Randomized PCA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../curvfuncs.html">Curvature Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../params.html">Parameter Utilities</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">fk_torchutils</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="index.html">Module code</a> &raquo;</li>
+        
+      <li>curvfuncs</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for curvfuncs</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s1">&#39;closure_factory&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;AVAILABLE_OPTIONS&#39;</span>
+<span class="p">]</span>
+
+<span class="n">AVAILABLE_OPTIONS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s1">&#39;grad&#39;</span><span class="p">,</span> <span class="s1">&#39;grad_pf&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;grads&#39;</span><span class="p">,</span> <span class="s1">&#39;grads_pf&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;diag_ggn&#39;</span><span class="p">,</span> <span class="s1">&#39;diag_ggn_pf&#39;</span>
+<span class="p">]</span>
+
+<div class="viewcode-block" id="closure_factory"><a class="viewcode-back" href="../curvfuncs.html#curvfuncs.closure_factory">[docs]</a><span class="k">def</span> <span class="nf">closure_factory</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">loss</span><span class="p">,</span> <span class="n">outputs</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Creates closues for optimizers based on curvature information.</span>
+<span class="sd">    </span>
+<span class="sd">    The closure will take :code:`noise` as an argument, and pass it</span>
+<span class="sd">    to the model before computing the loss; :code:`loss(model(x, noise))`.</span>
+
+<span class="sd">    The closure returns the loss as the first argument.</span>
+<span class="sd">    The remaining outputs depend on the content of outputs, which should be</span>
+<span class="sd">    a list of string matching the :code:`AVAILABLE_OPTIONS`:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        {0}</span>
+
+<span class="sd">    .. warning::</span>
+
+<span class="sd">        :code:`loss` needs to be able to broadcast through the :code:`noise`</span>
+<span class="sd">        batch dimension.</span>
+<span class="sd">        If :code:`noise` is a [S x D] tensor, </span>
+<span class="sd">        :code:`x` is a [N x ...] tensor </span>
+<span class="sd">        :code:`model(x, noise)` will be a [S x N x ...] tensor.</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        model (Torch Model): A differentiable function </span>
+<span class="sd">        x (Tensor): The inputs to the model </span>
+<span class="sd">        loss (function): A function that returns the loss.</span>
+<span class="sd">          will be called using loss(model(x))</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="nb">all</span><span class="p">([</span><span class="n">name</span> <span class="ow">in</span> <span class="n">AVAILABLE_OPTIONS</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">outputs</span><span class="p">])</span>
+    <span class="n">closures</span> <span class="o">=</span> <span class="p">[</span><span class="n">MAPPING</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">outputs</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">closure</span><span class="p">(</span><span class="n">noise</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">outputs</span><span class="p">,</span> <span class="n">activations</span><span class="p">,</span> <span class="n">linear_combs</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">noise</span><span class="p">,</span> <span class="n">indgrad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">linear_grads</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">loss</span><span class="p">(</span><span class="n">outputs</span><span class="p">),</span> <span class="n">linear_combs</span><span class="p">,</span> <span class="n">retain_graph</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">([</span><span class="n">loss</span><span class="p">(</span><span class="n">outputs</span><span class="p">)]</span> <span class="o">+</span> <span class="p">[</span><span class="n">c</span><span class="p">(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linear_grads</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">closures</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">closure</span></div>
+
+<span class="n">closure_factory</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">closure_factory</span><span class="o">.</span><span class="vm">__doc__</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">AVAILABLE_OPTIONS</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">grad_pf</span><span class="p">(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linear_grads</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return the overall gradient in parameter format&quot;&quot;&quot;</span>
+    <span class="n">grads</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">G</span><span class="p">,</span> <span class="n">X</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">linear_grads</span><span class="p">,</span> <span class="n">activations</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">gW</span> <span class="o">=</span> <span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">@</span> <span class="n">X</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">gB</span> <span class="o">=</span> <span class="n">G</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">G</span> <span class="o">=</span> <span class="n">G</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">gW</span> <span class="o">=</span> <span class="n">G</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">X</span>
+            <span class="n">gB</span> <span class="o">=</span> <span class="n">G</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">grads</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gW</span><span class="p">)</span>
+        <span class="n">grads</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gB</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">grads</span>
+
+<span class="k">def</span> <span class="nf">grads_pf</span><span class="p">(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linear_grads</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return individual gradients in parameter format&quot;&quot;&quot;</span>
+    <span class="n">grads</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">G</span><span class="p">,</span> <span class="n">X</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">linear_grads</span><span class="p">,</span> <span class="n">activations</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">gW</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span>
+                    <span class="s1">&#39;...ij,...jk-&gt;...ik&#39;</span><span class="p">,</span>
+                    <span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span> <span class="n">X</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="n">gW</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;...ij,...jk-&gt;...ik&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span> <span class="n">X</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">)))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">G</span> <span class="o">=</span> <span class="n">G</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">gW</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">bmm</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">X</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">gB</span> <span class="o">=</span> <span class="n">G</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+
+        <span class="n">grads</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gW</span><span class="p">)</span>
+        <span class="n">grads</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gB</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">grads</span>
+
+<span class="k">def</span> <span class="nf">diag_ggn_pf</span><span class="p">(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linear_grads</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return the diagonal of the GGN in parameter format&quot;&quot;&quot;</span>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+<span class="k">def</span> <span class="nf">flatten_last_dim</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+    <span class="n">mats</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">params</span><span class="p">:</span>
+        <span class="n">newshape</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">shape</span><span class="p">)[:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">mats</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">newshape</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">mats</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">flatten_last_dim_</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="k">return</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">flatten_last_dim</span><span class="p">(</span><span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">))</span>
+
+<span class="k">def</span> <span class="nf">grad</span><span class="p">(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linear_grads</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return the overall gradient as a matrix&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">flatten_last_dim_</span><span class="p">(</span><span class="n">grad_pf</span><span class="p">)(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linear_grads</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">grads</span><span class="p">(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linear_grads</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return individual gradients as a matrix&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">flatten_last_dim_</span><span class="p">(</span><span class="n">grads_pf</span><span class="p">)(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linear_grads</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">diag_ggn</span><span class="p">(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linear_grads</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return the diagonal of the GGN as a matrix&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">flatten_last_dim_</span><span class="p">(</span><span class="n">diag_ggn_pf</span><span class="p">)(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linear_grads</span><span class="p">)</span>
+
+<span class="n">MAPPING</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;grad_pf&#39;</span><span class="p">:</span> <span class="n">grad_pf</span><span class="p">,</span>
+    <span class="s1">&#39;grads_pf&#39;</span><span class="p">:</span> <span class="n">grads_pf</span><span class="p">,</span>
+    <span class="s1">&#39;diag_ggn_pf&#39;</span><span class="p">:</span> <span class="n">diag_ggn_pf</span><span class="p">,</span>
+    <span class="s1">&#39;grad&#39;</span><span class="p">:</span> <span class="n">grad</span><span class="p">,</span>
+    <span class="s1">&#39;grads&#39;</span><span class="p">:</span> <span class="n">grads</span><span class="p">,</span>
+    <span class="s1">&#39;diag_ggn&#39;</span><span class="p">:</span> <span class="n">diag_ggn</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

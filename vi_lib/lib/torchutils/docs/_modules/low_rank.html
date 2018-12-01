@@ -1,0 +1,352 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>low_rank &mdash; fk_torchutils  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> fk_torchutils
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">TorchUtils</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../low_rank.html">Fast Operations with Low-Rank + Diagonal Matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../distributions.html">Distributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fastpca.html">Fast Randomized PCA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../curvfuncs.html">Curvature Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../params.html">Parameter Utilities</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">fk_torchutils</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="index.html">Module code</a> &raquo;</li>
+        
+      <li>low_rank</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for low_rank</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Linear Algebra routines for Low-Rank + Diagonal Matrix operations</span>
+
+<span class="sd">This module implements operations involving a matrix :math:`A` that can be written as</span>
+<span class="sd">:math:`UU^\top + D`, where :math:`U` is a low rank :math:`[n \times k]` matrix,</span>
+<span class="sd">:math:`k \ll n`, and :math:`D` is a diagonal :math:`[n \times n]` matrix.</span>
+
+<span class="sd">Those can be implemented more efficiently when working with :math:`U, D` directly</span>
+<span class="sd">instead of computing :math:`A`, especially if :math:`n` is large</span>
+<span class="sd">and :math:`A` might not fit into memory.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># Disable naming scheme error for math symbols (U, d, k, ...)</span>
+<span class="c1"># pylint: disable=C0103</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;mult&quot;</span><span class="p">,</span> <span class="s2">&quot;invMult&quot;</span><span class="p">,</span> <span class="s2">&quot;factMult&quot;</span><span class="p">,</span> <span class="s2">&quot;invFactMult&quot;</span><span class="p">,</span> <span class="s2">&quot;logdet&quot;</span><span class="p">,</span> <span class="s2">&quot;trace&quot;</span>
+<span class="p">]</span>
+
+<span class="k">def</span> <span class="nf">reduceRank</span><span class="p">(</span><span class="n">U</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Reduces a symmetric factorization to a full rank symmetric factorization.</span>
+
+<span class="sd">    Given a matrix :math:`U` of size :math`[n \times k]`, returns a matrix :math:`W`</span>
+<span class="sd">    of size :math:`[n \times r(U)]`, where :math:`r(U)` is the rank of :math:`U`,</span>
+<span class="sd">    such that :math:`WW`\top = UU^\top`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+<div class="viewcode-block" id="mult"><a class="viewcode-back" href="../low_rank.html#low_rank.mult">[docs]</a><span class="k">def</span> <span class="nf">mult</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes :math:`Ax` where :math:`A = UU^\top + diag(d)`</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        U (Tensor): a low-rank matrix of size [n x k]</span>
+<span class="sd">        d (Tensor): a vector ([n x 1] Tensor) representing the diagonal</span>
+<span class="sd">        x (Tensor): size [n x d]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">d</span><span class="o">*</span><span class="n">x</span> <span class="o">+</span> <span class="n">U</span> <span class="o">@</span> <span class="p">(</span><span class="n">U</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">x</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="invMult"><a class="viewcode-back" href="../low_rank.html#low_rank.invMult">[docs]</a><span class="k">def</span> <span class="nf">invMult</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes :math:`A^{-1}x` where :math:`A = UU^\top + diag(d)`</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        U (Tensor): a low-rank matrix of size [n x k]</span>
+<span class="sd">        d (Tensor): a vector ([n x 1] Tensor) representing the diagonal</span>
+<span class="sd">        x (Tensor): size [n x d]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dInv</span> <span class="o">=</span> <span class="mi">1</span><span class="o">/</span><span class="n">d</span>
+    <span class="n">I_k</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">U</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">U</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">U</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">Kinv</span> <span class="o">=</span> <span class="n">I_k</span> <span class="o">+</span> <span class="n">U</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="p">(</span><span class="n">dInv</span> <span class="o">*</span> <span class="n">U</span><span class="p">)</span>
+
+    <span class="n">s1</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="p">(</span><span class="n">dInv</span> <span class="o">*</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">s2</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">gesv</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">Kinv</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dInv</span><span class="o">*</span><span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="p">(</span><span class="n">U</span> <span class="o">@</span> <span class="n">s2</span><span class="p">))</span></div>
+
+<span class="k">def</span> <span class="nf">factCore</span><span class="p">(</span><span class="n">V</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes :math:`K` such that :math:`I_n + VKV^\top`</span>
+<span class="sd">    is a square-root for :math:`I_n + VV^\top`</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        V (Tensor): a low-rank matrix of size [n x k]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">I_k</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">V</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">V</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">V</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">L</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">potrf</span><span class="p">(</span><span class="n">V</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">V</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">potrf</span><span class="p">(</span><span class="n">I_k</span> <span class="o">+</span> <span class="n">L</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">L</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">Linv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">L</span><span class="p">)</span>
+    <span class="n">K</span> <span class="o">=</span> <span class="n">Linv</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="p">(</span><span class="n">M</span> <span class="o">-</span> <span class="n">I_k</span><span class="p">)</span> <span class="o">@</span> <span class="n">Linv</span>
+    <span class="k">return</span> <span class="n">K</span>
+
+<div class="viewcode-block" id="factMult"><a class="viewcode-back" href="../low_rank.html#low_rank.factMult">[docs]</a><span class="k">def</span> <span class="nf">factMult</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes :math:`Bx` where :math:`BB^\top = UU^\top + diag(d)`</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        U (Tensor): a low-rank matrix of size [n x k]</span>
+<span class="sd">        d (Tensor): a vector ([n x 1] Tensor) representing the diagonal</span>
+<span class="sd">        x (Tensor): size [n x d]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">d_sqrt</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+    <span class="n">V</span> <span class="o">=</span> <span class="n">U</span><span class="o">/</span><span class="n">d_sqrt</span>
+
+    <span class="n">K</span> <span class="o">=</span> <span class="n">factCore</span><span class="p">(</span><span class="n">V</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">d_sqrt</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="n">V</span> <span class="o">@</span> <span class="p">(</span><span class="n">K</span> <span class="o">@</span> <span class="p">(</span><span class="n">V</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">x</span><span class="p">)))</span></div>
+
+<div class="viewcode-block" id="invFactMult"><a class="viewcode-back" href="../low_rank.html#low_rank.invFactMult">[docs]</a><span class="k">def</span> <span class="nf">invFactMult</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes :math:`Cx` where :math:`CC^\top = (UU^\top + diag(d))^{-1}`</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        U (Tensor): a low-rank matrix of size [n x k]</span>
+<span class="sd">        d (Tensor): a vector ([n x 1] Tensor) representing the diagonal</span>
+<span class="sd">        x (Tensor): size [n x d]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">d_sqrt</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+    <span class="n">V</span> <span class="o">=</span> <span class="n">U</span><span class="o">/</span><span class="n">d_sqrt</span>
+
+    <span class="n">K</span> <span class="o">=</span> <span class="n">factCore</span><span class="p">(</span><span class="n">V</span><span class="p">)</span>
+
+    <span class="n">dirInv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">K</span><span class="o">.</span><span class="n">t</span><span class="p">())</span> <span class="o">+</span> <span class="n">V</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">V</span><span class="p">)</span> <span class="o">@</span> <span class="p">(</span><span class="n">V</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">V</span> <span class="o">@</span> <span class="n">dirInv</span><span class="p">)</span><span class="o">/</span><span class="n">d_sqrt</span></div>
+
+<div class="viewcode-block" id="logdet"><a class="viewcode-back" href="../low_rank.html#low_rank.logdet">[docs]</a><span class="k">def</span> <span class="nf">logdet</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes :math:`\det(A)` where :math:`A = UU^\top + diag(d)`</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        U (Tensor): a low-rank matrix of size [n x k]</span>
+<span class="sd">        d (Tensor): a vector ([n x 1] Tensor) representing the diagonal</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">V</span> <span class="o">=</span> <span class="n">U</span><span class="o">/</span><span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+    <span class="n">I_K</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">U</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">U</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">U</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">sign</span><span class="p">,</span> <span class="n">logdet_factor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">slogdet</span><span class="p">(</span><span class="n">I_K</span> <span class="o">+</span> <span class="n">V</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">V</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">sign</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">d</span><span class="p">))</span> <span class="o">+</span> <span class="n">logdet_factor</span></div>
+
+<div class="viewcode-block" id="trace"><a class="viewcode-back" href="../low_rank.html#low_rank.trace">[docs]</a><span class="k">def</span> <span class="nf">trace</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes :math:`\text{Trace}(A)` where :math:`A = UU^\top + diag(d)`</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        U (Tensor): a low-rank matrix of size [n x k]</span>
+<span class="sd">        d (Tensor): a vector ([n x 1] Tensor) representing the diagonal</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">U</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span></div>
+
+<span class="k">def</span> <span class="nf">invFacts</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the inverse of (UU^T + d) in a low-memory cost factorization.</span>
+<span class="sd">    Returns A, B, v, giving the inverse as :math:`\text{diag}(v) - A @ B`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dInv</span> <span class="o">=</span> <span class="mi">1</span><span class="o">/</span><span class="n">d</span>
+    <span class="n">I_k</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">U</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">U</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">U</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">Kinv</span> <span class="o">=</span> <span class="n">I_k</span> <span class="o">+</span> <span class="n">U</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="p">(</span><span class="n">dInv</span> <span class="o">*</span> <span class="n">U</span><span class="p">)</span>
+
+    <span class="n">s1</span> <span class="o">=</span> <span class="p">(</span><span class="n">U</span> <span class="o">*</span> <span class="n">dInv</span><span class="p">)</span><span class="o">.</span><span class="n">t</span><span class="p">()</span>
+    <span class="n">s2</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">gesv</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">Kinv</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dInv</span><span class="o">*</span><span class="n">U</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">dInv</span>
+
+<span class="k">def</span> <span class="nf">invDiag</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the diagonal of the inverse of (UU^T + d)&quot;&quot;&quot;</span>
+    <span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">invFacts</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">v</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">A</span> <span class="o">*</span> <span class="n">B</span><span class="o">.</span><span class="n">t</span><span class="p">(),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">diag</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the diagonal of (UU^T + d)&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">U</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">d</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,336 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Models &mdash; fk_torchutils  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Sampling" href="models_sampling.html" />
+    <link rel="prev" title="Distributions" href="distributions.html" /> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> fk_torchutils
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="index.html">TorchUtils</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="low_rank.html">Fast Operations with Low-Rank + Diagonal Matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="distributions.html">Distributions</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="models_sampling.html">Sampling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="models_individual_gradients.html">Individual Gradient computations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="fastpca.html">Fast Randomized PCA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="curvfuncs.html">Curvature Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="params.html">Parameter Utilities</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">fk_torchutils</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Models</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/models.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="module-models">
+<span id="models"></span><h1>Models<a class="headerlink" href="#module-models" title="Permalink to this headline">¶</a></h1>
+<p>Instantiation helpers for simple models.</p>
+<p>See the detailled pages for</p>
+<ul class="simple">
+<li><a class="reference external" href="models_individual_gradients.html">Individual gradients computation</a></li>
+<li><a class="reference external" href="models_sampling.html">Sampling</a></li>
+</ul>
+<div class="toctree-wrapper compound">
+</div>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="#models.MLP" title="models.MLP"><code class="xref py py-obj docutils literal notranslate"><span class="pre">models.MLP</span></code></a></td>
+<td>MLP with additional support for individual gradients and sampling.</td>
+</tr>
+</tbody>
+</table>
+<dl class="class">
+<dt id="models.MLP">
+<em class="property">class </em><code class="descclassname">models.</code><code class="descname">MLP</code><span class="sig-paren">(</span><em>input_size</em>, <em>hidden_sizes=None</em>, <em>output_size=1</em>, <em>act_func=&lt;built-in method tanh of type object&gt;</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/models.html#MLP"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.MLP" title="Permalink to this definition">¶</a></dt>
+<dd><p>MLP with additional support for individual gradients and sampling.</p>
+<p>Additional capabilities:</p>
+<blockquote>
+<div><ul class="simple">
+<li>Sampling with additive noise to the parameters</li>
+<li>Individual Gradients computation</li>
+</ul>
+</div></blockquote>
+<dl class="docutils">
+<dt>Sampling:</dt>
+<dd><p class="first">Let D be the number of parameters of the MLP.
+Forward accepts a <cite>noise</cite> parameter, a <cite>[D x S]</cite> matrix
+representing <cite>S</cite> independent samples of additive noise.</p>
+<p class="last">The ordering of the parameters follows the conventions of
+* <cite>torch.nn.utils.parameters_to_vector</cite>
+* <cite>torch.nn.utils.vector_to_parameters</cite></p>
+</dd>
+<dt>Individual gradients computations:</dt>
+<dd>To support manual differentiation of each layer,
+the <cite>forward</cite> pass accepts a <cite>indgrad</cite> parameter</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>Creates a MLP with two hidden layers of size [64, 16],
+taking 256-valued input and returning a single output.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">MLP</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span> <span class="p">[</span><span class="mi">64</span><span class="p">,</span> <span class="mi">16</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>input_size</strong> (<em>int</em>) – Size of the input.</li>
+<li><strong>hidden_sizes</strong> (<em>List of int</em>) – Size of the hidden layers.
+Defaults to [] (no hidden layer).</li>
+<li><strong>output_size</strong> (<em>int</em>) – Size of the output.
+Defaults to 1</li>
+<li><strong>act_func</strong> – Activation function (see <code class="docutils literal notranslate"><span class="pre">torch.nn.functional</span></code>).
+Defaults to <code class="docutils literal notranslate"><span class="pre">torch.tanh</span></code>.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="models.MLP.forward">
+<code class="descname">forward</code><span class="sig-paren">(</span><em>x</em>, <em>noise=None</em>, <em>indgrad=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/models.html#MLP.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.MLP.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass with support for additive noise to the parameters.</p>
+<p><code class="code docutils literal notranslate"><span class="pre">x</span></code> needs to be a [N x input_size] matrix, where N is the
+minibatch dimension, and
+<code class="code docutils literal notranslate"><span class="pre">noise</span></code> needs to be None or a [S x D] dimension, where S is the
+number of samples and D matches the number of parameters of the model.</p>
+<p><strong>Sampling:</strong></p>
+<p>Batch computation with additive noise to the parameters
+is supported through the <code class="code docutils literal notranslate"><span class="pre">noise</span></code> argument, a [S x D] Tensor
+representing additive noise to the parameters.</p>
+<p><strong>Individual gradients computations:</strong></p>
+<p>To support manual differentiation of each layer,
+the <cite>forward</cite> function returns the inputs and output
+of each linear layer in parameter format.</p>
+<p>See <a class="reference internal" href="curvfuncs.html#module-curvfuncs" title="curvfuncs"><code class="xref py py-mod docutils literal notranslate"><span class="pre">curvfuncs</span></code></a> for use cases.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>x</strong> (<em>Tensor</em>) – [N x input_size]</li>
+<li><strong>noise</strong> (<em>Tensor</em>) – [S x D] additive noise matrix matrix,
+where <cite>D</cite> is the number of model parameters.
+Defaults to a no additive noise.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><p>A tuple containing</p>
+<blockquote>
+<div><ul class="simple">
+<li><strong>y</strong> (Tensor): [(S) x N x output_size] output, where
+S is the noise batch dimension and N is the minibatch
+dimension.
+The noise dimension is not present if no noise was passed,
+and thus a [N x output_size] matrix is returned instead.</li>
+<li><strong>activations</strong>, <strong>linear_combs</strong> (Optional - if <code class="docutils literal notranslate"><span class="pre">indgrad</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>):
+list of the input and output tensors of each layer
+to manually compute individual gradients.</li>
+</ul>
+</div></blockquote>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

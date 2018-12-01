@@ -1,0 +1,399 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Individual Gradient computations &mdash; fk_torchutils  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Fast Randomized PCA" href="fastpca.html" />
+    <link rel="prev" title="Sampling" href="models_sampling.html" /> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> fk_torchutils
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="index.html">TorchUtils</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="low_rank.html">Fast Operations with Low-Rank + Diagonal Matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="distributions.html">Distributions</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="models.html">Models</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="models_sampling.html">Sampling</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Individual Gradient computations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#goodfellow-s-trick">Goodfellow’s trick</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#notation-setup">Notation Setup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#single-layer">Single Layer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#manual-differentiation-for-the-last-step">Manual Differentiation for the last step</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#putting-it-together">Putting it together</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="fastpca.html">Fast Randomized PCA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="curvfuncs.html">Curvature Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="params.html">Parameter Utilities</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">fk_torchutils</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="models.html">Models</a> &raquo;</li>
+        
+      <li>Individual Gradient computations</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/models_individual_gradients.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="individual-gradient-computations">
+<h1>Individual Gradient computations<a class="headerlink" href="#individual-gradient-computations" title="Permalink to this headline">¶</a></h1>
+<p>PyTorch’s autodifferentiation (AD) library is optimized to return gradients of scalar functions, not Jacobians (“gradients” of vectors).
+This means that it is not possible to get individual gradients for each example passed through a Neural Network.
+If <code class="docutils literal notranslate"><span class="pre">pytorch.autograd</span></code> is used to take the derivative of vector, it is assumed that the user wants the gradient of the sum of the elements of that vector.</p>
+<p>As users often only want the overall gradient, this makes it possible to optimize the backward calls for that use case
+and avoid storing big tensors with a dimension dedicated to the samples.</p>
+<div class="section" id="goodfellow-s-trick">
+<h2>Goodfellow’s trick<a class="headerlink" href="#goodfellow-s-trick" title="Permalink to this headline">¶</a></h2>
+<p>It is however still possible to use part of the automatic differentiation toolkit to get individual gradients
+without <em>too much</em> efforts, using Ian Goodfellow’s <a class="reference external" href="https://arxiv.org/pdf/1510.01799.pdf">Efficient Per-Example Gradient Computations</a>.
+At least for simple models with linear layers.</p>
+<div class="section" id="notation-setup">
+<h3>Notation Setup<a class="headerlink" href="#notation-setup" title="Permalink to this headline">¶</a></h3>
+<p>A bit of notation; consider the following model,</p>
+<div class="math notranslate nohighlight">
+\[A_0 \stackrel{T_1(A_0, W_1)}{\longrightarrow}
+Z_1 \stackrel{\sigma}{\longrightarrow}
+A_1 \stackrel{T_2(A_1, W_2)}{\longrightarrow}
+... \stackrel{T_L(A_{L-1}, W_L)}{\longrightarrow}
+Z_L \stackrel{\sigma}{\longrightarrow}
+A_L \stackrel{\mathcal{L}(A_L, y)}{\longrightarrow} e\]</div>
+<p>where</p>
+<ul class="simple">
+<li><span class="math notranslate nohighlight">\(A_0\)</span> is the input of the network,</li>
+<li><span class="math notranslate nohighlight">\(T_l(A_{l-1}, W_l)\)</span> is the transformation of the <span class="math notranslate nohighlight">\(l\)</span> th layer parametrized by <span class="math notranslate nohighlight">\(W_l\)</span>,
+e.g. a linear layer <span class="math notranslate nohighlight">\(T_l(A_{l-1}, W_l) = W_l A_{l-1}\)</span>,</li>
+<li><span class="math notranslate nohighlight">\(\sigma\)</span> is a parameter-less transformation, e.g. a sigmoid non-linearity,</li>
+<li><span class="math notranslate nohighlight">\(A_L\)</span> is the output of the network</li>
+<li><span class="math notranslate nohighlight">\(\mathcal{L}(A_L, y)\)</span> is the loss function (where the summing/averaging over examples happens)</li>
+<li>and <span class="math notranslate nohighlight">\(e\)</span> is the loss.</li>
+</ul>
+<p>The typical use of <code class="docutils literal notranslate"><span class="pre">autograd</span></code> would use a single function <span class="math notranslate nohighlight">\(f(X) = e\)</span>, representing the model and loss,
+and give the derivative with respect to <span class="math notranslate nohighlight">\(W_1, ..., W_L\)</span> as a list of tensors of matching sizes.</p>
+</div>
+<div class="section" id="single-layer">
+<h3>Single Layer<a class="headerlink" href="#single-layer" title="Permalink to this headline">¶</a></h3>
+<p>Assume that we are interested in the per-example gradient computation for the <span class="math notranslate nohighlight">\(l\)</span> layer, <span class="math notranslate nohighlight">\(T_l(A_{l-1}, W_l)\)</span>,
+where <span class="math notranslate nohighlight">\(W_L\)</span> is of size <span class="math notranslate nohighlight">\((d_{in}, d_{out})\)</span>.
+<span class="math notranslate nohighlight">\(A_l\)</span> would be of size <span class="math notranslate nohighlight">\((n, d_{in})\)</span>, where <span class="math notranslate nohighlight">\(n\)</span> is the number of examples passed through the network.
+We would want the derivatives in a <span class="math notranslate nohighlight">\((n, d_{in}, d_{out})\)</span> Tensor <code class="docutils literal notranslate"><span class="pre">dW_l</span></code>,
+where <code class="docutils literal notranslate"><span class="pre">dW_l[0,:,:]</span></code> would be the <span class="math notranslate nohighlight">\((d_{in}, d_{out})\)</span> gradient for the first example.</p>
+<p>Using the chain rule, we can rewrite the gradient of <span class="math notranslate nohighlight">\(f\)</span> with respect to <span class="math notranslate nohighlight">\(W_l\)</span> as the gradient of <span class="math notranslate nohighlight">\(Z_l\)</span> with respect to <span class="math notranslate nohighlight">\(W_l\)</span> and the gradient of <span class="math notranslate nohighlight">\(f\)</span> with respect to <span class="math notranslate nohighlight">\(Z_l\)</span>,</p>
+<div class="math notranslate nohighlight">
+\[\frac{\partial f}{\partial W_l} = \frac{\partial Z_l}{\partial W_l} \frac{\partial f}{\partial Z_l}.\]</div>
+<p>This is useful as <code class="docutils literal notranslate"><span class="pre">autograd</span></code> will happily compute <span class="math notranslate nohighlight">\(G_l = \frac{\partial f}{\partial Z_l}\)</span>,
+the output being unidimensional, giving a <span class="math notranslate nohighlight">\((n, d_{out})\)</span> matrix.
+The computation of <span class="math notranslate nohighlight">\(\frac{\partial Z_l}{\partial W_l}\)</span> however is not supported by <code class="docutils literal notranslate"><span class="pre">autograd</span></code>
+- as <span class="math notranslate nohighlight">\(Z_l\)</span> is not a scalar, the output would be the gradient of the sum of the elements of <span class="math notranslate nohighlight">\(Z_l\)</span>.</p>
+<p>This is also useful as the summation over the example dimension only happens during the computation of that final step,
+taking <span class="math notranslate nohighlight">\(\frac{\partial Z_l}{\partial W_l}\)</span> and multiplying it with <span class="math notranslate nohighlight">\(\frac{\partial f}{\partial Z_l}\)</span>.
+We can do this step manually in an efficient way - assuming the transformation from <span class="math notranslate nohighlight">\(A_{l-1}\)</span> to <span class="math notranslate nohighlight">\(Z_l\)</span> is simple.</p>
+</div>
+<div class="section" id="manual-differentiation-for-the-last-step">
+<h3>Manual Differentiation for the last step<a class="headerlink" href="#manual-differentiation-for-the-last-step" title="Permalink to this headline">¶</a></h3>
+<p>Assuming that <span class="math notranslate nohighlight">\(T_l\)</span> is a linear transformation, <span class="math notranslate nohighlight">\(T_l(A_{l-1}, W_l) = W_l A_{l-1} = Z_l\)</span>,
+the derivative of <span class="math notranslate nohighlight">\(Z_l\)</span> w.r.t <span class="math notranslate nohighlight">\(W_l\)</span> is simply</p>
+<div class="math notranslate nohighlight">
+\[\frac{\partial Z_l}{\partial W_l} = A_{l-1}^\top.\]</div>
+<p>If <span class="math notranslate nohighlight">\(f\)</span> involved a summation over the examples,
+the gradient of that sum w.r.t. <span class="math notranslate nohighlight">\(W_l\)</span> would be given by <span class="math notranslate nohighlight">\(A_{l-1}^\top G_l\)</span>
+- the multiplication of <span class="math notranslate nohighlight">\((d_{in}, n) \times (n, d_{out})\)</span> matrices giving a <span class="math notranslate nohighlight">\((d_{in}, d_{out})\)</span> matrix
+where the summation happens in the example dimension.
+The gradient with respect to the first example would be given by <code class="docutils literal notranslate"><span class="pre">A_lm1[:,</span> <span class="pre">0]</span> <span class="pre">&#64;</span> <span class="pre">G_l[0,</span> <span class="pre">:]</span></code> (where <code class="docutils literal notranslate"><span class="pre">A_lm1</span></code> is <span class="math notranslate nohighlight">\(A_{l-1}\)</span>)
+and a <em>naive</em> way to compute the sum of the gradients for all examples would be</p>
+<div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>grad_w_l = torch.zeros((d_in, d_out))
+for i in range(n):
+        grad_w_l += A_lm1[:, i] @ G_l[i, :]
+</pre></div>
+</div>
+<p>To get the result we want - the gradients in a <span class="math notranslate nohighlight">\((n, d_{in}, d_{out})\)</span> tensor - we could use</p>
+<div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>ind_grad_w_l = torch.zeros((n, d_in, d_out))
+for i in range(n):
+        grad_w_l[i, :, :] = A_lm1[:, i] @ G_l[i, :]
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">Don’t actually use that code - for loops are incredibly inefficient.</p>
+</div>
+<p>To get the benefit of batch matrix computation, we can use <code class="docutils literal notranslate"><span class="pre">torch.bmm</span></code>,
+where the batch dimension matches the examples.
+Given tensors of sizes <span class="math notranslate nohighlight">\((n, d_{in}, 1), (n, 1, d_{out})\)</span>, <code class="docutils literal notranslate"><span class="pre">bmm</span></code> returns a <span class="math notranslate nohighlight">\((n, d_{in}, d_{out})\)</span> tensor
+- basically performing the previous piece of code in batch.
+Thus, the following function call gives us the individual gradients,</p>
+<div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>ind_grad_w_l = torch.bmm(G_l.unsqueeze(2), A_lm1.unsqueeze(1))
+</pre></div>
+</div>
+<p>If the transformation is a linear transformation with a bias term,
+the gradient for the bias term can be computed similarly
+and would simply ge <code class="docutils literal notranslate"><span class="pre">G_l</span></code> in that case.</p>
+</div>
+<div class="section" id="putting-it-together">
+<h3>Putting it together<a class="headerlink" href="#putting-it-together" title="Permalink to this headline">¶</a></h3>
+<p>We’ll need:</p>
+<ul>
+<li><p class="first">A model’s <code class="docutils literal notranslate"><span class="pre">forward</span></code> function returning the intermediate layers <span class="math notranslate nohighlight">\(A_l, Z_l\)</span>.</p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MLP</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+
+        <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_size</span><span class="p">,</span> <span class="n">hidden_sizes</span><span class="p">):</span>
+                <span class="nb">super</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">input_size</span> <span class="o">=</span> <span class="n">input_size</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">act</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">hidden_layers</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">([</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_size</span><span class="p">,</span> <span class="n">out_size</span><span class="p">)</span> <span class="k">for</span> <span class="n">in_size</span><span class="p">,</span> <span class="n">out_size</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">input_size</span><span class="p">]</span> <span class="o">+</span> <span class="n">hidden_sizes</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">hidden_sizes</span><span class="p">)])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">output_layer</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">hidden_sizes</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+                <span class="n">A</span> <span class="o">=</span> <span class="n">x</span>
+
+                <span class="n">activations</span> <span class="o">=</span> <span class="p">[</span><span class="n">A</span><span class="p">]</span>
+                <span class="n">linearCombs</span> <span class="o">=</span> <span class="p">[]</span>
+
+                <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">hidden_layers</span><span class="p">:</span>
+                        <span class="n">Z</span> <span class="o">=</span> <span class="n">layer</span><span class="p">(</span><span class="n">A</span><span class="p">)</span>
+                        <span class="n">A</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">act</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span>
+
+                        <span class="c1"># Save the activations and linear combinations from this layer.</span>
+                        <span class="n">activations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">A</span><span class="p">)</span>
+                        <span class="n">Z</span><span class="o">.</span><span class="n">retain_grad</span><span class="p">()</span>
+                        <span class="n">Z</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span>
+                        <span class="n">linearCombs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span>
+
+                <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_layer</span><span class="p">(</span><span class="n">A</span><span class="p">)</span>
+
+                <span class="c1"># Save the linear combinations from the output</span>
+                <span class="n">y</span><span class="o">.</span><span class="n">retain_grad</span><span class="p">()</span>
+                <span class="n">y</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span>
+                <span class="n">linearCombs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+
+                <span class="k">return</span> <span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">activations</span><span class="p">,</span> <span class="n">linearCombs</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p class="first">A function to <em>manually</em> compute the last part of the differentiation for each layer</p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">goodfellow_backprop</span><span class="p">(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linearGrads</span><span class="p">):</span>
+
+        <span class="n">L</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">linearGrads</span><span class="p">)</span>
+        <span class="n">grads</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">L</span><span class="p">):</span>
+                <span class="n">G_l</span><span class="p">,</span> <span class="n">A_lm1</span> <span class="o">=</span> <span class="n">linearGrads</span><span class="p">[</span><span class="n">l</span><span class="p">],</span> <span class="n">activations</span><span class="p">[</span><span class="n">l</span><span class="p">]</span>
+
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+                        <span class="n">G_l</span> <span class="o">=</span> <span class="n">G_l</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+                <span class="n">grads</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">bmm</span><span class="p">(</span><span class="n">G_l</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">A_lm1</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)))</span>
+                <span class="n">grads</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">G_l</span><span class="p">)</span> <span class="c1"># Gradient for the bias term</span>
+
+        <span class="k">return</span> <span class="n">grads</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p class="first">Compute the derivative of the final function with respect to <span class="math notranslate nohighlight">\(Z_l\)</span>.</p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">y_pred</span><span class="p">,</span> <span class="n">activations</span><span class="p">,</span> <span class="n">linearCombs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+<span class="n">loss</span> <span class="o">=</span> <span class="n">loss_func</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+
+<span class="n">linearGrads</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">loss</span><span class="p">,</span> <span class="n">linearCombs</span><span class="p">)</span>
+<span class="n">gradients</span> <span class="o">=</span> <span class="n">goodfellow_backprop</span><span class="p">(</span><span class="n">activations</span><span class="p">,</span> <span class="n">linearGrads</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

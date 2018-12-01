@@ -1,0 +1,285 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Parameter Utilities &mdash; fk_torchutils  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Curvature Functions" href="curvfuncs.html" /> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> fk_torchutils
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="index.html">TorchUtils</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="low_rank.html">Fast Operations with Low-Rank + Diagonal Matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="distributions.html">Distributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fastpca.html">Fast Randomized PCA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="curvfuncs.html">Curvature Functions</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Parameter Utilities</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#parameter-formats">Parameter Formats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#batch-parameter-formats">Batch Parameter Formats</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">fk_torchutils</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Parameter Utilities</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/params.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="module-params">
+<span id="parameter-utilities"></span><h1>Parameter Utilities<a class="headerlink" href="#module-params" title="Permalink to this headline">¶</a></h1>
+<p>Handling of parameter formats and other parameter-related utilities.</p>
+<div class="section" id="parameter-formats">
+<h2>Parameter Formats<a class="headerlink" href="#parameter-formats" title="Permalink to this headline">¶</a></h2>
+<p>Batch versions of the functions <code class="xref py py-meth docutils literal notranslate"><span class="pre">vector_to_parameters()</span></code>
+and <code class="xref py py-meth docutils literal notranslate"><span class="pre">parameters_to_vector()</span></code> of the <code class="xref py py-mod docutils literal notranslate"><span class="pre">torch.nn.utils</span></code> module
+allows to go from PyTorch’s Parameter Format to a single tensor format.</p>
+<p class="rubric">Example</p>
+<p>Consider network consisting of two linear layers where
+the input, hidden and output dimensions are D, H and O.</p>
+<ul class="simple">
+<li>The <code class="docutils literal notranslate"><span class="pre">Parameter</span> <span class="pre">Format</span> <span class="pre">(PF)</span></code>, given by <code class="xref py py-meth docutils literal notranslate"><span class="pre">model.parameters()</span></code>,
+list tensors for each layer and
+would contain a [D x H] and a [H x O] tensor.</li>
+<li>The <code class="docutils literal notranslate"><span class="pre">vector</span> <span class="pre">format</span></code> would be a single [(D*H*O) x 1] tensor.</li>
+</ul>
+</div>
+<div class="section" id="batch-parameter-formats">
+<h2>Batch Parameter Formats<a class="headerlink" href="#batch-parameter-formats" title="Permalink to this headline">¶</a></h2>
+<p>The batch version allows to specify batch dimensions to convert multiple
+sets of parameters between those two formats.</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="xref py py-meth docutils literal notranslate"><span class="pre">params.bv2p()</span></code>: A tensor of shape [S x D], where D matches
+the number of parameter a given <code class="xref py py-meth docutils literal notranslate"><span class="pre">model.parameters()</span></code>,
+can be converted to a list of tensors of shapes [S x …]
+where <code class="docutils literal notranslate"><span class="pre">...</span></code> matches the shape of each tensor of
+the <code class="xref py py-meth docutils literal notranslate"><span class="pre">model.parameters()</span></code></li>
+<li><code class="xref py py-meth docutils literal notranslate"><span class="pre">params.bp2v()</span></code>: A list of batch parameter format in batch form,
+where each tensor has some batch dimension [S x …] will have its
+non batch-dimensions <code class="docutils literal notranslate"><span class="pre">...</span></code> flattened and returned as a single
+[S x D] tensor, where D is the number of parameters</li>
+</ul>
+</div></blockquote>
+<p>Both methods support an arbitrary number of batch dimensions.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last"><code class="xref py py-meth docutils literal notranslate"><span class="pre">torch.nn.utils.vector_to_parameters()</span></code> (abbreviated <code class="docutils literal notranslate"><span class="pre">p2v</span></code>) is an
+in-place function which takes the vector and _assigns_ it to the parameters.
+The batch version <code class="docutils literal notranslate"><span class="pre">bp2v</span></code> takes a vector and _returns_ the list in
+parameter format.
+Passing a one dimensional tensor to <code class="xref py py-meth docutils literal notranslate"><span class="pre">params.bv2p()</span></code> is an out-of-place
+version of <code class="xref py py-meth docutils literal notranslate"><span class="pre">torch.nn.utils.vector_to_parameters()</span></code>.</p>
+</div>
+</div>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><code class="xref py py-obj docutils literal notranslate"><span class="pre">params.bp2v</span></code></td>
+<td>Shortcut for <code class="xref py py-meth docutils literal notranslate"><span class="pre">params.batch_parameterformat_to_vec()</span></code></td>
+</tr>
+<tr class="row-even"><td><code class="xref py py-obj docutils literal notranslate"><span class="pre">params.bv2p</span></code></td>
+<td>Shortcut for <code class="xref py py-meth docutils literal notranslate"><span class="pre">params.batch_vec_to_parameterformat()</span></code></td>
+</tr>
+<tr class="row-odd"><td><code class="xref py py-obj docutils literal notranslate"><span class="pre">params.batch_vec_to_parameterformat</span></code></td>
+<td>Batch conversion from vector format to parameter format</td>
+</tr>
+<tr class="row-even"><td><code class="xref py py-obj docutils literal notranslate"><span class="pre">params.batch_parameterformat_to_vec</span></code></td>
+<td>Batch conversion from parameter format to vector format</td>
+</tr>
+<tr class="row-odd"><td><code class="xref py py-obj docutils literal notranslate"><span class="pre">params.num_params</span></code></td>
+<td>Returns the number of parameters in a list of parameters (pf)</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
