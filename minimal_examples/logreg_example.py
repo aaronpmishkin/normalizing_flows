@@ -34,37 +34,32 @@ N,D = X.size()
 initial_dist = MultivariateNormal(torch.zeros(2), torch.eye(2))
 
 # Initialize the normalizing flow:
-model = NormalizingFlow(initial_dist, dimension=2, num_layers=5)
+model = NormalizingFlow(initial_dist, dimension=2, num_layers=20)
 
 # Initialize the optimizer:
-optimizer = Adam(model.parameters(), lr=0.1)
+optimizer = Adam(model.parameters(), lr=0.01)
 
 # Training Parameters:
-num_mc_samples = 100
-num_epochs = 100
+num_mc_samples = 20
+num_epochs = 2000
 
 
 # Set up prediction and loss functions:
 def predict_fn(x, mc_samples):
     # Sample parameters from the flow:
     thetas = []
-    for _ in range(mc_samples):
-        theta, log_prob = model.forward()
-        thetas.append(theta)
+    theta, log_prob = model.forward(num_samples=mc_samples)
 
-    theta_matrix = torch.stack(thetas, dim=0)
-    logits = torch.matmul(theta_matrix, x.t())
+    logits = torch.matmul(theta, x.t())
     return logits
 
 # Compute the KL divergence by sampling from q and p:
 def kl_fn():
-    kl_divergence = 0
-    for _ in range(num_mc_samples):
-        theta, q_log_prog = model.forward()
-        p_log_prob = prior_dist.log_prob(theta)
-        kl_divergence = kl_divergence + (q_log_prog - p_log_prob)
+    theta, q_log_prog = model.forward(num_samples=num_mc_samples)
+    p_log_prob = prior_dist.log_prob(theta)
 
-    kl_divergence = kl_divergence / num_mc_samples
+    kl_divergence = torch.sum(q_log_prog - p_log_prob) / num_mc_samples
+
     return kl_divergence
 
 
@@ -135,36 +130,51 @@ prior_density = prior.reshape((w1.shape[0], w2.shape[0]))
 joint_density = joint.reshape((w1.shape[0], w2.shape[0]))
 posterior_density = post.reshape((w1.shape[0], w2.shape[0]))
 
-vis.visualize_prior_joint_posterior(w1, w2, prior_density, joint_density, posterior_density)
-
+fig, (ax1) = plt.subplots(1, 1, figsize=(18, 6))
+c1 = vis.plot_density(ax1, w1, w2, posterior_density, title="Posterior", xlim=[-2,10], ylim=[-2,10])
 
 # Plot normalizing flow posterior:
 
-grid_spacing = 0.5
+grid_spacing = 0.1
 w1, w2 = np.mgrid[-2:10:grid_spacing, -2:10:grid_spacing]
 # Compute all combinations of w1 and w2 values from the grid.
 W = np.squeeze(np.dstack((w1.reshape(w1.size), w2.reshape(w2.size))))
 
 W_tensor = torch.tensor(W).to(torch.float)
 
-log_probs = []
-for w in W_tensor:
-    z, log_prob_reverse = model.inverse(w)
-    # print(w, log_prob_reverse)
-    # w_prime, log_prob_forward = model.forward(z)
-    # print(w_prime, log_prob_forward)
-    log_probs.append(log_prob_reverse)
-
-log_probs = torch.stack(log_probs)
+# log_probs = []
+# for w in W_tensor:
+#     z, log_prob_reverse = model.inverse(w)
+#     # print(w, log_prob_reverse)
+#     # w_prime, log_prob_forward = model.forward(z)
+#     # print(w_prime, log_prob_forward)
+#     log_probs.append(log_prob_reverse)
+#
+# log_probs = torch.stack(log_probs)
 
 fig, (ax) = plt.subplots(1, 1, figsize=(6, 6))
-nf_density = torch.exp(log_probs.reshape(w1.shape[0], w2.shape[0]))
+# nf_density = torch.exp(log_probs.reshape(w1.shape[0], w2.shape[0]))
+#
+# ax.set_title("Normalizing Flow")
+# contour = ax.contourf(w1, w2, nf_density.detach().numpy())
+# ax.set_xlabel("w_1"); ax.set_ylabel("w_2")
+# xlim=[-2,10]
+# ylim=[-2,10]
+# ax.set_xlim(xlim)
+# ax.set_ylim(ylim)
 
-ax.set_title("Normalizing Flow")
-contour = ax.contourf(w1, w2, nf_density.detach().numpy())
-ax.set_xlabel("w_1"); ax.set_ylabel("w_2")
-xlim=[-2,20]
-ylim=[-2,20]
-ax.set_xlim(xlim)
-ax.set_ylim(ylim)
+# Try Kernel density estimation:
+
+# take a larger number of samples from the normalizing flow
+
+samples, log_probs = model.forward(num_samples=10000)
+samples = samples.detach().numpy().T
+
+kernel = stats.gaussian_kde(samples)
+
+Z = kernel(W.T)
+print(Z.shape)
+Z = Z.reshape((w1.shape[0], w2.shape[0]))
+contour = ax.contourf(w1, w2, Z)
+
 plt.show()

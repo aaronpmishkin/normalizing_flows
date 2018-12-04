@@ -52,9 +52,12 @@ def plot_logreg_data(ax, X, y):
     ax.legend()
     ax.set_ylim([-3, 10])
 
-def plot_density(ax, w1, w2, density, levels, title="", xlim=[-2,20], ylim=[-2,20]):
+def plot_density(ax, w1, w2, density, levels=None, title="", xlim=[-2,20], ylim=[-2,20]):
     ax.set_title(title)
-    contour = ax.contourf(w1, w2, density, levels=levels)
+    if levels is None:
+        contour = ax.contourf(w1, w2, density)
+    else:
+        contour = ax.contourf(w1, w2, density, levels=levels)
     ax.set_xlabel("w_1"); ax.set_ylabel("w_2")
 
     ax.set_xlim(xlim)

@@ -36,9 +36,9 @@ class NormalizingFlow(nn.Module):
         self.output_layer = SupportTransformLayer(support_transform, bounds=support_bounds)
 
     # Forward pass implements sampling:
-    def forward(self, z=None):
+    def forward(self, z=None, num_samples=1):
         if z is None:
-            z = self.initial_dist.sample()
+            z = self.initial_dist.sample_n(num_samples)
 
         log_prob = self.initial_dist.log_prob(z)
 
@@ -51,12 +51,14 @@ class NormalizingFlow(nn.Module):
 
     # Inverse pass computes the log_prob of an example.
     def inverse(self, y):
-        z = self.output_layer.inverse(y)
+        log_prob = 0
+
+        z, log_prob = self.output_layer.inverse(y, log_prob)
 
         for layer in reversed(self.transform_layers):
-            z = layer.inverse(z)
+            z, log_prob = layer.inverse(z, log_prob)
 
-        log_prob = self.initial_dist.log_prob(z)
+        log_prob = log_prob + self.initial_dist.log_prob(z)
 
         return z, log_prob
 
@@ -91,8 +93,12 @@ class SupportTransformLayer(nn.Module):
 
         return y, log_prob
 
-    def inverse(self, y):
-        return self.inverse_transform(y)
+    def inverse(self, y, log_prob):
+        z = self.inverse_transform(y)
+        log_prob = log_prob - self.log_det_jac_fn(z)
+
+        return z, log_prob
+
 
 class PlanarTransformLayer(nn.Module):
 
@@ -119,9 +125,13 @@ class PlanarTransformLayer(nn.Module):
 
         return y, log_prob
 
-    def inverse(self, y):
+    def inverse(self, y, log_prob):
         u_reparam = self._u_reparam()
-        return FT.planar_inverse_transform(y, u_reparam, self.w, self.b)
+        z = FT.planar_inverse_transform(y, u_reparam, self.w, self.b)
+
+        log_prob = log_prob - FT.planar_log_det_jac(z, u_reparam, self.w, self.b)
+
+        return z, log_prob
 
 
 
