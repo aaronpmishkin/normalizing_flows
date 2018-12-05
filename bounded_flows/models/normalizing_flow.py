@@ -17,7 +17,7 @@ import torch.nn.functional as F
 
 class NormalizingFlow(nn.Module):
 
-    def __init__(self, initial_dist, dimension, num_layers=5, support_transform="r", support_bounds=None):
+    def __init__(self, initial_dist, dimension, num_layers=5, TransformLayer=None, transform_params=None, support_transform="r", support_bounds=None):
         super(type(self), self).__init__()
 
         self.initial_dist = initial_dist
@@ -32,7 +32,7 @@ class NormalizingFlow(nn.Module):
         self.inverse_transform = FT.planar_inverse_transform
 
         # Setup the transformations:
-        self.transform_layers =  nn.ModuleList([PlanarTransformLayer(dimension) for k in range(num_layers)])
+        self.transform_layers =  nn.ModuleList([TransformLayer(dimension, transform_params[k]) for k in range(num_layers)])
         self.output_layer = SupportTransformLayer(support_transform, bounds=support_bounds)
 
     # Forward pass implements sampling:
@@ -100,9 +100,48 @@ class SupportTransformLayer(nn.Module):
         return z, log_prob
 
 
+class CouplingTransformLayer(nn.Module):
+
+    def __init__(self, dimension, params=None):
+        super(type(self), self).__init__()
+
+        if params is None:
+            raise ValueError("Coupling transform parameters cannot be 'None'")
+
+        self.dimension = dimension
+
+        mask, s_fn, t_fn = params
+        self.mask = mask
+        self.s_fn = s_fn
+        self.t_fn = t_fn
+
+        # register the parameters of the scale and shift
+        # operaters. This ensures that fitting the coupling layer
+        # fits the parameterizing functions.
+        for i, param in enumerate(s_fn.parameters()):
+            self.register_parameter("s_fn_" + str(i), param)
+
+        for i, param in enumerate(t_fn.parameters()):
+            self.register_parameter("t_fn_" + str(i), param)
+
+
+    def forward(self, z, log_prob):
+        y = FT.coupling_transform(z, self.mask, self.s_fn, self.t_fn)
+        log_prob = log_prob - FT.coupling_log_det_jac(z, self.mask, self.s_fn, self.t_fn)
+
+        return y, log_prob
+
+    def inverse(self, y, log_prob):
+        z = FT.coupling_inverse_transform(y, self.mask, self.s_fn, self.t_fn)
+        log_prob = log_prob - FT.planar_log_det_jac(z, u_reparam, self.w, self.b)
+
+        return z, log_prob
+
+
+
 class PlanarTransformLayer(nn.Module):
 
-    def __init__(self, dimension):
+    def __init__(self, dimension, params=None):
         super(type(self), self).__init__()
         self.w = Parameter(torch.ones(dimension, requires_grad=True))
         self.u = Parameter(torch.zeros(dimension, requires_grad=True))
