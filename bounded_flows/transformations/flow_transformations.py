@@ -8,6 +8,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 import bounded_flows.root_finding.newton as newton
 
@@ -62,29 +63,31 @@ def planar_log_det_jac(Z, u, w, b):
 
 def coupling_transform(Z, mask, s_fn, t_fn):
     Z_masked = Z.mul(mask)
-    Y_masked = Z_masked
+    s = F.softplus(s_fn(Z_masked))
 
-    Z_unmasked = Z.mul(1 - mask)
-    Y_unmasked = Z_unmasked.mul(torch.exp(s_fn(Z_masked))) + t_fn(Z_masked)
-    Y = Y_masked + Y_unmasked
+    # temporary check
+    if np.isnan(torch.sum(s).detach().numpy()):
+        raise ValueError
+
+    t = t_fn(Z_masked)
+    Y = (Z.mul(s) + t).mul(1 - mask) + Z_masked
 
     return Y
 
 
 def coupling_inverse_transform(Y, mask, s_fn, t_fn):
     Y_masked = Y.mul(mask)
-    Z_masked = Y_masked
-
-    Y_unmasked = Y.mul(1 - mask)
-    Z_unmasked = (Y_unmasked - t_fn(Z_masked)).mul(torch.exp( - s_fn(Z_masked)))
-
-    Z = Z_masked + Z_unmasked
+    s = F.softplus(s_fn(Y_masked))
+    t = t_fn(Y_masked)
+    Z = (Y - t).div(s).mul(1 - mask) + Y_masked
 
     return Z
 
 def coupling_log_det_jac(Z, mask, s_fn, t_fn):
     Z_masked = Z.mul(mask)
-    log_det = torch.sum(s_fn(Z_masked), dim=1)
+    s = F.softplus(s_fn(Z_masked))
+    log_s = torch.log(s).mul(1 - mask)
+    log_det = torch.sum(log_s, dim=1)
 
     return log_det
 

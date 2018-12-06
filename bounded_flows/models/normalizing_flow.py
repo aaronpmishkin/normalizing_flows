@@ -133,7 +133,7 @@ class CouplingTransformLayer(nn.Module):
 
     def inverse(self, y, log_prob):
         z = FT.coupling_inverse_transform(y, self.mask, self.s_fn, self.t_fn)
-        log_prob = log_prob - FT.planar_log_det_jac(z, u_reparam, self.w, self.b)
+        log_prob = log_prob - FT.coupling_log_det_jac(z, self.mask, self.s_fn, self.t_fn)
 
         return z, log_prob
 
