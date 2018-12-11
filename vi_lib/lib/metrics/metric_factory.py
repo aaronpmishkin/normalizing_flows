@@ -1,8 +1,5 @@
 # @Author: amishkin
-# @Date:   18-08-17
 # @Email:  amishkin@cs.ubc.ca
-# @Last modified by:   aaronmishkin
-# @Last modified time: 18-09-13
 
 from functools import partial
 

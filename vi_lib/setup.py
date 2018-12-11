@@ -6,7 +6,7 @@ here = path.abspath(path.dirname(__file__))
 setup(
     name='lib',
     version='0.1.0',
-    description='',  
+    description='',
     long_description="",
     url='https://bitbucket.org/aaronpmishkin/vi_lib/',
     author='',

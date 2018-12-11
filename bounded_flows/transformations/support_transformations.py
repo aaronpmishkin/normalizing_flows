@@ -1,8 +1,5 @@
 # @Author: aaronmishkin
-# @Date:   18-11-25
 # @Email:  amishkin@cs.ubc.ca
-# @Last modified by:   aaronmishkin
-# @Last modified time: 18-11-25
 
 import math
 import torch
@@ -82,27 +79,33 @@ def simplex_transform(z):
     """ An invertible transformation from R^N -> ∆^{N+1} (the probability simplex) given by the inverse additive log-ratio (ALR) transform.
             y = exp(z) / (1 + sum(exp(z)))
     """
-    # TODO: decide whether or not to return the N+1 elements of the probability vector or just N elements (the last is implicitly defined).
     exp_z = torch.exp(z)
-    return exp_z.div(1 + torch.sum(exp_z))
+    y_final = 1 / (1 + torch.sum(exp_z, dim=1))
+    y_final = y_final.unsqueeze(dim=1)
+    y = exp_z.mul(y_final)
+
+    y = torch.cat([y, y_final], dim=1)
+
+    return y
 
 def simplex_inverse_transform(y):
     """ Inverse of simplex_transform. This is simply the additive log-ratio (ALR) transform.
     """
-    # TODO: same as above.
-    y_final = 1 - torch.sum(y)
+    y_final = y[:, -1].unsqueeze(dim=1)
+    z = torch.log(y)[:, 0:-1] - torch.log(y_final)
 
-    return torch.log(y) - torch.log(y_final)
+    return z
 
 
 def simplex_log_det_jac(z):
     """ Log-determinant of the Jacobian of simplex_inverse_transform. This is computed efficiently using the matrix determinant lemma.
     """
+    D = z.size()[1]
     exp_z = torch.exp(z)
-    alpha = 1 + torch.sum(exp_z)
-    uDv = torch.sum(exp_z) / alpha
-    # The determinant is postive because all factors in the determinant's product are postive.
-    log_det = torch.sum(z) + torch.log(1 + uDv) - torch.log(alpha)
+    alpha = 1 + torch.sum(exp_z, dim=1)
+    uDv = torch.sum(exp_z, dim=1).div(alpha)
+    # The determinant is always postive because all factors in the product are postive.
+    log_det = torch.sum(z, dim=1) + torch.log(1 - uDv) - D * torch.log(alpha)
     return log_det
 
 

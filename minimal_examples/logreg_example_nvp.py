@@ -1,8 +1,5 @@
 # @Author: aaronmishkin
-# @Date:   18-11-25
 # @Email:  amishkin@cs.ubc.ca
-# @Last modified by:   aaronmishkin
-# @Last modified time: 18-11-26
 
 import math
 import torch
@@ -15,7 +12,7 @@ import matplotlib.pyplot as plt
 
 import bounded_flows.data.logreg_synthetic as data
 from bounded_flows.models.normalizing_flow import NormalizingFlow, CouplingTransformLayer
-import bounded_flows.plotting.log_reg_example as vis
+import bounded_flows.plotting.densities as vis
 
 # VI_LIB
 from lib.models.mlp import MLP
@@ -45,14 +42,14 @@ def generate_mask(D):
     mask = mask[torch.randperm(D)]
     return mask
 
-num_layers = 10
+num_layers = 5
 
 params = []
 for layer in range(num_layers):
     mask = generate_mask(D)
     # linear models
-    s_fn = MLP(input_size=D, hidden_sizes=[5], output_size=D, act_func="relu")
-    t_fn = MLP(input_size=D, hidden_sizes=[5], output_size=D, act_func="relu")
+    s_fn = MLP(input_size=D, hidden_sizes=[10, 10], output_size=D, act_func="relu")
+    t_fn = MLP(input_size=D, hidden_sizes=[10, 10], output_size=D, act_func="relu")
 
     params.append((mask, s_fn, t_fn))
 
@@ -153,8 +150,9 @@ prior_density = prior.reshape((w1.shape[0], w2.shape[0]))
 joint_density = joint.reshape((w1.shape[0], w2.shape[0]))
 posterior_density = post.reshape((w1.shape[0], w2.shape[0]))
 
-fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 6))
-c1 = vis.plot_density(ax3, w1, w2, posterior_density, title="Posterior", xlim=[-2,10], ylim=[-2,10])
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+c1 = vis.plot_density(ax1, w1, w2, posterior_density, title="Posterior", xlim=[-2,10], ylim=[-2,10])
+
 
 # Plot normalizing flow posterior:
 
@@ -170,27 +168,13 @@ log_probs = []
 z, log_probs = model.inverse(W_tensor)
 
 nf_density = torch.exp(log_probs.reshape(w1.shape[0], w2.shape[0]))
-#
-# ax.set_title("Normalizing Flow")
-contour = ax2.contourf(w1, w2, nf_density.detach().numpy())
-# ax.set_xlabel("w_1"); ax2.set_ylabel("w_2")
-# xlim=[-2,10]
-# ylim=[-2,10]
-# ax.set_xlim(xlim)
-# ax.set_ylim(ylim)
 
-# Try Kernel density estimation:
 
-# take a larger number of samples from the normalizing flow
+samples, log_probs = model.forward(num_samples=100)
+print(samples)
+print(torch.exp(log_probs))
 
-samples, log_probs = model.forward(num_samples=10000)
-samples = samples.detach().numpy().T
+contour = ax2.contourf(w1, w2, nf_density.detach().numpy(), levels=c1.levels)
 
-kernel = stats.gaussian_kde(samples)
-
-Z = kernel(W.T)
-print(Z.shape)
-Z = Z.reshape((w1.shape[0], w2.shape[0]))
-contour = ax1.contourf(w1, w2, Z)
 
 plt.show()

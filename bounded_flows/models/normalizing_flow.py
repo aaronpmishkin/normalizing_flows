@@ -1,8 +1,5 @@
 # @Author: aaronmishkin
-# @Date:   18-11-25
 # @Email:  amishkin@cs.ubc.ca
-# @Last modified by:   aaronmishkin
-# @Last modified time: 18-11-25
 
 from functools import partial
 
@@ -51,9 +48,7 @@ class NormalizingFlow(nn.Module):
 
     # Inverse pass computes the log_prob of an example.
     def inverse(self, y):
-        log_prob = 0
-
-        z, log_prob = self.output_layer.inverse(y, log_prob)
+        z, log_prob = self.output_layer.inverse(y, 0)
 
         for layer in reversed(self.transform_layers):
             z, log_prob = layer.inverse(z, log_prob)
@@ -61,6 +56,17 @@ class NormalizingFlow(nn.Module):
         log_prob = log_prob + self.initial_dist.log_prob(z)
 
         return z, log_prob
+
+    def make_kl_fn(prior_dist):
+
+        def kl_fn():
+            theta, q_log_prob = self.forward(num_samples=num_mc_samples)
+            p_log_prob = prior_dist.log_prob(theta)
+            kl_divergence = torch.sum(q_log_prob - p_log_prob) / num_mc_samples
+
+            return kl_divergence
+
+        return kl_fn
 
 class SupportTransformLayer(nn.Module):
     def __init__(self, support_transform, bounds=None):

@@ -142,30 +142,7 @@ W = np.squeeze(np.dstack((w1.reshape(w1.size), w2.reshape(w2.size))))
 
 W_tensor = torch.tensor(W).to(torch.float)
 
-# log_probs = []
-# for w in W_tensor:
-#     z, log_prob_reverse = model.inverse(w)
-#     # print(w, log_prob_reverse)
-#     # w_prime, log_prob_forward = model.forward(z)
-#     # print(w_prime, log_prob_forward)
-#     log_probs.append(log_prob_reverse)
-#
-# log_probs = torch.stack(log_probs)
-
 fig, (ax) = plt.subplots(1, 1, figsize=(6, 6))
-# nf_density = torch.exp(log_probs.reshape(w1.shape[0], w2.shape[0]))
-#
-# ax.set_title("Normalizing Flow")
-# contour = ax.contourf(w1, w2, nf_density.detach().numpy())
-# ax.set_xlabel("w_1"); ax.set_ylabel("w_2")
-# xlim=[-2,10]
-# ylim=[-2,10]
-# ax.set_xlim(xlim)
-# ax.set_ylim(ylim)
-
-# Try Kernel density estimation:
-
-# take a larger number of samples from the normalizing flow
 
 samples, log_probs = model.forward(num_samples=10000)
 samples = samples.detach().numpy().T

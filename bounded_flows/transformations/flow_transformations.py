@@ -1,8 +1,5 @@
 # @Author: aaronmishkin
-# @Date:   18-11-25
 # @Email:  amishkin@cs.ubc.ca
-# @Last modified by:   aaronmishkin
-# @Last modified time: 18-11-25
 
 import math
 import torch
@@ -59,39 +56,31 @@ def planar_log_det_jac(Z, u, w, b):
 
 # Coupling Transforms: Unchecked
 
-
-
 def coupling_transform(Z, mask, s_fn, t_fn):
     Z_masked = Z.mul(mask)
-    s = F.softplus(s_fn(Z_masked))
-
-    # temporary check
-    if np.isnan(torch.sum(s).detach().numpy()):
-        raise ValueError
+    s = torch.exp(s_fn(Z_masked))
 
     t = t_fn(Z_masked)
     Y = (Z.mul(s) + t).mul(1 - mask) + Z_masked
 
     return Y
 
-
 def coupling_inverse_transform(Y, mask, s_fn, t_fn):
     Y_masked = Y.mul(mask)
-    s = F.softplus(s_fn(Y_masked))
+
+    s = torch.exp(-1 * s_fn(Y_masked))
     t = t_fn(Y_masked)
-    Z = (Y - t).div(s).mul(1 - mask) + Y_masked
+
+    Z = (Y - t).mul(s).mul(1 - mask) + Y_masked
 
     return Z
 
 def coupling_log_det_jac(Z, mask, s_fn, t_fn):
     Z_masked = Z.mul(mask)
-    s = F.softplus(s_fn(Z_masked))
-    log_s = torch.log(s).mul(1 - mask)
+    log_s = s_fn(Z_masked).mul(1 - mask)
     log_det = torch.sum(log_s, dim=1)
 
     return log_det
-
-
 
 
 # Helper Functions:
