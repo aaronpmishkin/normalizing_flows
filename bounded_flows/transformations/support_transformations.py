@@ -45,8 +45,7 @@ def r_plus_log_det_jac(z):
     """Log-determinant of the Jacobian of the r_plus_transform. This is identical to the log-determinant of the softplus function.
         log(det J(z)) = sum(log(sigma(z)))
     """
-    # determinant is always positive in this case since sigma(z) \in (0,1)
-    log_det = torch.sum(F.logsigmoid(z))
+    log_det = torch.sum(F.logsigmoid(z), dim=1)
     return log_det
 
 # R BOUNDED
@@ -69,8 +68,7 @@ def r_bounded_log_det_jac(z, c, b):
     """Log-determinant of the Jacobian of the r_bounded_transform. This is the log-determinant of the softplus function with a scaling factor.
     """
 
-    # May not be able to simply take the log...
-    log_det = torch.sum(torch.log(torch.abs(b)) - z - 2 * torch.softplus(-z, beta=1, threshold=math.inf))
+    log_det = torch.sum(torch.log(torch.abs(b)) - z - 2 * torch.softplus(-z, beta=1, threshold=math.inf), dim=1)
     return log_det
 
 # PROBABILITY SIMPLEX
@@ -104,7 +102,6 @@ def simplex_log_det_jac(z):
     exp_z = torch.exp(z)
     alpha = 1 + torch.sum(exp_z, dim=1)
     uDv = torch.sum(exp_z, dim=1).div(alpha)
-    # The determinant is always postive because all factors in the product are postive.
     log_det = torch.sum(z, dim=1) + torch.log(1 - uDv) - D * torch.log(alpha)
     return log_det
 

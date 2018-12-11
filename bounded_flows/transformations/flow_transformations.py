@@ -54,8 +54,6 @@ def planar_log_det_jac(Z, u, w, b):
     return torch.log(torch.abs(det))
 
 
-# Coupling Transforms: Unchecked
-
 def coupling_transform(Z, mask, s_fn, t_fn):
     Z_masked = Z.mul(mask)
     s = torch.exp(s_fn(Z_masked))

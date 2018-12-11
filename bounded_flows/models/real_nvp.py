@@ -12,7 +12,7 @@ from bounded_flows.models.normalizing_flow                      import Normalizi
 from lib.models.mlp                                             import  MLP
 
 def real_nvp_flow(D, flow_layers, nn_layers, nn_act_func, support_transform="r", support_bounds=None):
-    """ Instantiate a real NVP flow parameterized by neural networks. """
+    """ Instantiate a real NVP flow with scale and shift functions given by neural networks. """
     initial_dist = torch.distributions.MultivariateNormal(torch.zeros(D), torch.eye(D))
 
     params = []
