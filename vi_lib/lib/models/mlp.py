@@ -1,3 +1,4 @@
+# Originally written by Didrik Nielsen
 
 import math
 import numpy as np

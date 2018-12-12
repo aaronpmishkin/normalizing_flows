@@ -8,11 +8,11 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 
 import bounded_flows.transformations.support_transformations as ST
-import bounded_flows.transformations.flow_transformations as FT
+import bounded_flows.transformations.conditional_flow_transformations as FT
 import torch.nn.functional as F
 
 
-class NormalizingFlow(nn.Module):
+class ConditionalNormalizingFlow(nn.Module):
 
     def __init__(self, initial_dist, dimension, num_layers=5, TransformLayer=None, transform_params=None, support_transform="r", support_bounds=None):
         super(type(self), self).__init__()
@@ -23,31 +23,37 @@ class NormalizingFlow(nn.Module):
             self.dimension = dimension
         else :
             self.dimension = 1
-            
+
+
         # Setup the transformations:
         self.transform_layers =  nn.ModuleList([TransformLayer(dimension, transform_params[k]) for k in range(num_layers)])
         self.output_layer = SupportTransformLayer(support_transform, bounds=support_bounds)
 
     # Forward pass implements sampling:
-    def forward(self, z=None, num_samples=1):
+    def forward(self, o, z=None, num_samples=1):
         if z is None:
+            if o.size()[0] == 1:
+                o = o.repeat((num_samples, 1))
+            else:
+                num_samples = o.size()[0]
+
             z = self.initial_dist.sample_n(num_samples)
+
 
         log_prob = self.initial_dist.log_prob(z)
 
         for layer in self.transform_layers:
-            z, log_prob = layer.forward(z, log_prob)
+            z, log_prob = layer.forward(o, z, log_prob)
 
         y, log_prob = self.output_layer.forward(z, log_prob)
 
         return y, log_prob
 
     # Inverse pass computes the log_prob of an example.
-    def inverse(self, y):
+    def inverse(self, o, y):
         z, log_prob = self.output_layer.inverse(y, 0)
-
         for layer in reversed(self.transform_layers):
-            z, log_prob = layer.inverse(z, log_prob)
+            z, log_prob = layer.inverse(o, z, log_prob)
 
         log_prob = log_prob + self.initial_dist.log_prob(z)
 
@@ -102,7 +108,7 @@ class SupportTransformLayer(nn.Module):
         return z, log_prob
 
 
-class CouplingTransformLayer(nn.Module):
+class ConditionalCouplingTransformLayer(nn.Module):
 
     def __init__(self, dimension, params=None):
         super(type(self), self).__init__()
@@ -127,53 +133,19 @@ class CouplingTransformLayer(nn.Module):
             self.register_parameter("t_fn_" + str(i), param)
 
 
-    def forward(self, z, log_prob):
-        y = FT.coupling_transform(z, self.mask, self.s_fn, self.t_fn)
-        log_prob = log_prob - FT.coupling_log_det_jac(z, self.mask, self.s_fn, self.t_fn)
+    def forward(self, o, z, log_prob):
+        # o is the observations
+        y = FT.coupling_inverse_transform(o, z, self.mask, self.s_fn, self.t_fn)
+        log_prob = log_prob + FT.coupling_log_det_jac(o, z, self.mask, self.s_fn, self.t_fn)
 
         return y, log_prob
 
-    def inverse(self, y, log_prob):
-        z = FT.coupling_inverse_transform(y, self.mask, self.s_fn, self.t_fn)
-        log_prob = log_prob - FT.coupling_log_det_jac(z, self.mask, self.s_fn, self.t_fn)
+    def inverse(self, o, y, log_prob):
+        # o is the observations
+        z = FT.coupling_transform(o, y, self.mask, self.s_fn, self.t_fn)
+        log_prob = log_prob + FT.coupling_log_det_jac(o, z, self.mask, self.s_fn, self.t_fn)
 
         return z, log_prob
-
-
-
-class PlanarTransformLayer(nn.Module):
-
-    def __init__(self, dimension, params=None):
-        super(type(self), self).__init__()
-        self.w = Parameter(torch.ones(dimension, requires_grad=True))
-        self.u = Parameter(torch.zeros(dimension, requires_grad=True))
-        self.b = Parameter(torch.tensor(0., requires_grad=True))
-
-    def _u_reparam(self):
-        wu = torch.dot(self.w, self.u)
-        m = F.softplus(wu) - 1
-        w_norm = torch.dot(self.w,self.w)
-
-        u_reparam = self.u + self.w.mul((m - wu) / w_norm)
-
-        return u_reparam
-
-    def forward(self, z, log_prob):
-        u_reparam = self._u_reparam()
-
-        y = FT.planar_transform(z, u_reparam, self.w, self.b)
-        log_prob = log_prob - FT.planar_log_det_jac(z, u_reparam, self.w, self.b)
-
-        return y, log_prob
-
-    def inverse(self, y, log_prob):
-        u_reparam = self._u_reparam()
-        z = FT.planar_inverse_transform(y, u_reparam, self.w, self.b)
-
-        log_prob = log_prob - FT.planar_log_det_jac(z, u_reparam, self.w, self.b)
-
-        return z, log_prob
-
 
 
 

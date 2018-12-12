@@ -2,14 +2,13 @@
 # @Email:  amishkin@cs.ubc.ca
 
 # Adapted from code originally written by Brooks Paige: https://github.com/tbrx/compiled-inference
-# Aaron: I think this code is completely useless...
-
 
 import torch
 import torch.nn as nn
 import torch.tensor as tensor
 import torch.nn.init as init
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 import numpy as np
 
@@ -92,37 +91,88 @@ class AbstractConditionalMADE(nn.Module):
             ln_q = ln_q.resize(ns, original_batch_size)
         return values, ln_q
 
-# TODO: We could setup a ConditionalSimplexMADE, although I don't think it can actually factorize.
 
-# Aaron:
-# Combination of MADE and a normalizing flow --> output layers have *many* parameters...
-# We might consider adding the inputs (D_observed directly to the normalizing flows and avoiding MADE...)
-# None of the this code has been checked yet.
+class ConditionalBinaryMADE(AbstractConditionalMADE):
+    def __init__(self, D_observed, D_latent, H, num_layers):
+        super(ConditionalBinaryMADE, self).__init__(D_observed, D_latent, H, num_layers)
+
+        # layers
+        layers = [MaskedLinear(self.D_in, H, self.M_W[0])]
+        for i in xrange(1,num_layers):
+            layers.append(MaskedLinear(H, H, self.M_W[i]))
+        self.layers = nn.ModuleList(layers)
+        self.skip_p = MaskedLinear(self.D_in, self.D_out, self.M_A, bias=False)
+        self.skip_q = MaskedLinear(self.D_in, self.D_out, self.M_A, bias=False)
+        self.p = MaskedLinear(H, self.D_out, self.M_V)
+        self.q = MaskedLinear(H, self.D_out, self.M_V)
+        self.loss = nn.BCELoss(size_average=True)
+
+        # initialize parameters
+        for param in self.parameters():
+            if len(param.size()) == 1:
+                init.normal(param, std=0.01)
+            else:
+                init.uniform(param, a=-0.01, b=0.01)
+
+    def forward(self, x):
+        h = x
+        for i, layer in enumerate(self.layers):
+            h = self.relu(layer(h))
+        epsilon = 1e-8
+        logp = self.p(h) + self.skip_p(x) + epsilon
+        logq = self.q(h) + self.skip_q(x) + epsilon
+        A = torch.max(logp, logq, keepdim=True)
+        normalizer = ((logp - A).exp_() + (logq - A).exp_()).log() + A
+#         assert (1 - np.isfinite(normalizer.data.numpy())).sum() == 0
+        logp -= normalizer
+        return logp.exp_()
+
+    def sample(self, parents):
+        """ Given a setting of the observed (parent) random variables, sample values of the latents """
+        assert parents.size(1) == self.D_in - self.D_out
+        batch_size = parents.size(0)
+        FloatTensor = torch.cuda.FloatTensor if parents.is_cuda else torch.FloatTensor
+        latent = Variable(FloatTensor(batch_size, self.D_out))
+        randvals = Variable(FloatTensor(batch_size, self.D_out))
+        torch.rand(batch_size, self.D_out, out=randvals.data)
+        for d in xrange(self.D_out):
+            full_input = torch.cat((parents, latent), 1)
+            latent = torch.ge(self(full_input), randvals).float()
+        return latent
+
+    def logpdf(self, parents, values):
+        """ Return the conditional log probability `ln p(values|parents)` """
+        p = self.forward(torch.cat((parents, values), 1))
+        p = torch.clamp(p, 1e-6, 1.0 - 1e-6)
+        return -self.loss(p, values)*values.size(1)
+
+
+
 class ConditionalRealValueMADE(AbstractConditionalMADE):
-    def __init__(self, D_observed, D_latent, H, num_layers, flows):
+    def __init__(self, D_observed, D_latent, H, num_layers, num_components):
         super(ConditionalRealValueMADE, self).__init__(D_observed, D_latent, H, num_layers)
 
-        # Aaron: There must be one flow per latent variable (autoregressive model)
-        assert(len(flows) == D_latent)
-
-        self.flows = flows
+        self.K = num_components
+        self.softplus = nn.Softplus()
 
         layers = [MaskedLinear(self.D_in, H, self.M_W[0])]
         for i in xrange(1,num_layers):
             layers.append(MaskedLinear(H, H, self.M_W[i]))
         self.layers = nn.ModuleList(layers)
-
-        # Aaron: No skip connections for now...
-        flow_layers = []
-        for flow in flows:
-            param_layers = []
-            for parameter in flow.parameters():
-                out = parameter.size()
-                param_layers.append(MaskedLinear(H, out, self.M_V))
-            flow_layers.append(ModuleList(param_layers))
-
-        # Aaron: Can we nest modules like this?
-        self.flow_layers = ModuleList(flow_layers)
+        skip_alpha,skip_mu,skip_sigma,mu,alpha,sigma = [],[],[],[],[],[]
+        for k in xrange(num_components):
+            skip_alpha.append(MaskedLinear(self.D_in, self.D_out, self.M_A, bias=False))
+            skip_mu.append(MaskedLinear(self.D_in, self.D_out, self.M_A, bias=False))
+            skip_sigma.append(MaskedLinear(self.D_in, self.D_out, self.M_A, bias=False))
+            alpha.append(MaskedLinear(H, self.D_out, self.M_V))
+            mu.append(MaskedLinear(H, self.D_out, self.M_V))
+            sigma.append(MaskedLinear(H, self.D_out, self.M_V))
+        self.skip_alpha = nn.ModuleList(skip_alpha)
+        self.skip_mu = nn.ModuleList(skip_mu)
+        self.skip_sigma = nn.ModuleList(skip_sigma)
+        self.alpha = nn.ModuleList(alpha)
+        self.mu = nn.ModuleList(mu)
+        self.sigma = nn.ModuleList(sigma)
 
         # initialize parameters
         for param in self.parameters():
@@ -132,24 +182,25 @@ class ConditionalRealValueMADE(AbstractConditionalMADE):
                 init.uniform(param, a=-0.01, b=0.01)
 
 
-    # Aaron: This is where we obtain the parameterization of our normalizing flow.
+    # obtain parameterization of Gaussian Mixture. This is where we could substitute the parameterization of our normalizing flow.
     def forward(self, x):
         h = x
         for i, layer in enumerate(self.layers):
             h = self.relu(layer(h))
+        log_alpha = [self.alpha[k](h) + self.skip_alpha[k](x) for k in xrange(self.K)]
+        mu = [self.mu[k](h) + self.skip_mu[k](x) for k in xrange(self.K)]
+        sigma = [self.softplus(self.sigma[k](h) + self.skip_sigma[k](x)) for k in xrange(self.K)]
 
-        # Aaron: compute the parameters for each flow:
-        flow_params = []
-        for layers in flow_layers:
-            parameters = []
-            for param_layer in layers:
-                # Aaron: append the activations, which are the parameters of the normalizing flow
-                parameters.append(parameter_layer(h))
-            flow_params.append(parameters)
+        alpha = torch.cat(map(lambda x: x.unsqueeze(2), log_alpha), 2)
+        A, _ = torch.max(alpha, 2, keepdim=True)
+        tmp = torch.sum((alpha - A.expand(alpha.size())).exp_(), 2, keepdim=True).log()
+        log_normalizer = tmp + A
+        alpha = (alpha - log_normalizer.expand(alpha.size())).exp_()
+        mu = torch.cat(map(lambda x: x.unsqueeze(2), mu), 2)
+        sigma = torch.cat(map(lambda x: x.unsqueeze(2), sigma), 2)
+        sigma = torch.clamp(sigma, min=1e-6)
 
-        return flow_params
-
-    # TODO: Implement sample and logpdf routines:
+        return alpha, mu, sigma
 
     def sample(self, parents, ns=1):
         """ Given a setting of the observed (parent) random variables, sample values of the latents.
@@ -168,7 +219,6 @@ class ConditionalRealValueMADE(AbstractConditionalMADE):
         latent = Variable(torch.zeros(batch_size, self.D_out))
         randvals = Variable(torch.FloatTensor(batch_size, self.D_out))
         torch.randn(batch_size, self.D_out, out=randvals.data);
-        # Aaron: Looks like he's using the Gumbel trick to compute discrete random variables?
         gumbel = Variable(torch.rand(batch_size, self.D_out, self.K).log_().mul_(-1).log_().mul_(-1))
         if parents.is_cuda:
             latent = latent.cuda()
