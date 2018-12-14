@@ -59,10 +59,11 @@ def plot_simplex_density(density_fn, nlevels=200, subdiv=8, levels=None, **kwarg
         v = plt.tricontourf(trimesh, log_probs, nlevels, **kwargs)
     else:
         v = plt.tricontourf(trimesh, log_probs, levels=levels, **kwargs)
+    cur_axes = plt.gca()
+    cur_axes.set_facecolor('#E9BCAE')
 
-    plt.axis('equal')
     plt.xlim(0, 1)
     plt.ylim(0, 0.75**0.5)
-    plt.axis('off')
+    # plt.axis('off')
 
     return v

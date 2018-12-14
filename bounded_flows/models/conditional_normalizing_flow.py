@@ -70,6 +70,12 @@ class ConditionalNormalizingFlow(nn.Module):
 
         return kl_fn
 
+    def sample(self, parents, ns=1):
+        return self.forward(parents, num_samples=ns)
+
+    def logpdf(self, parents, values):
+        return self.inverse(parents, values)[1]
+
 class SupportTransformLayer(nn.Module):
     def __init__(self, support_transform, bounds=None):
         super(type(self), self).__init__()

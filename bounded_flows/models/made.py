@@ -98,7 +98,7 @@ class ConditionalBinaryMADE(AbstractConditionalMADE):
 
         # layers
         layers = [MaskedLinear(self.D_in, H, self.M_W[0])]
-        for i in xrange(1,num_layers):
+        for i in range(1,num_layers):
             layers.append(MaskedLinear(H, H, self.M_W[i]))
         self.layers = nn.ModuleList(layers)
         self.skip_p = MaskedLinear(self.D_in, self.D_out, self.M_A, bias=False)
@@ -135,7 +135,7 @@ class ConditionalBinaryMADE(AbstractConditionalMADE):
         latent = Variable(FloatTensor(batch_size, self.D_out))
         randvals = Variable(FloatTensor(batch_size, self.D_out))
         torch.rand(batch_size, self.D_out, out=randvals.data)
-        for d in xrange(self.D_out):
+        for d in range(self.D_out):
             full_input = torch.cat((parents, latent), 1)
             latent = torch.ge(self(full_input), randvals).float()
         return latent
@@ -156,11 +156,11 @@ class ConditionalRealValueMADE(AbstractConditionalMADE):
         self.softplus = nn.Softplus()
 
         layers = [MaskedLinear(self.D_in, H, self.M_W[0])]
-        for i in xrange(1,num_layers):
+        for i in range(1,num_layers):
             layers.append(MaskedLinear(H, H, self.M_W[i]))
         self.layers = nn.ModuleList(layers)
         skip_alpha,skip_mu,skip_sigma,mu,alpha,sigma = [],[],[],[],[],[]
-        for k in xrange(num_components):
+        for k in range(num_components):
             skip_alpha.append(MaskedLinear(self.D_in, self.D_out, self.M_A, bias=False))
             skip_mu.append(MaskedLinear(self.D_in, self.D_out, self.M_A, bias=False))
             skip_sigma.append(MaskedLinear(self.D_in, self.D_out, self.M_A, bias=False))
@@ -187,17 +187,17 @@ class ConditionalRealValueMADE(AbstractConditionalMADE):
         h = x
         for i, layer in enumerate(self.layers):
             h = self.relu(layer(h))
-        log_alpha = [self.alpha[k](h) + self.skip_alpha[k](x) for k in xrange(self.K)]
-        mu = [self.mu[k](h) + self.skip_mu[k](x) for k in xrange(self.K)]
-        sigma = [self.softplus(self.sigma[k](h) + self.skip_sigma[k](x)) for k in xrange(self.K)]
+        log_alpha = [self.alpha[k](h) + self.skip_alpha[k](x) for k in range(self.K)]
+        mu = [self.mu[k](h) + self.skip_mu[k](x) for k in range(self.K)]
+        sigma = [self.softplus(self.sigma[k](h) + self.skip_sigma[k](x)) for k in range(self.K)]
 
-        alpha = torch.cat(map(lambda x: x.unsqueeze(2), log_alpha), 2)
+        alpha = torch.cat(list(map(lambda x: x.unsqueeze(2), log_alpha)), 2)
         A, _ = torch.max(alpha, 2, keepdim=True)
         tmp = torch.sum((alpha - A.expand(alpha.size())).exp_(), 2, keepdim=True).log()
         log_normalizer = tmp + A
         alpha = (alpha - log_normalizer.expand(alpha.size())).exp_()
-        mu = torch.cat(map(lambda x: x.unsqueeze(2), mu), 2)
-        sigma = torch.cat(map(lambda x: x.unsqueeze(2), sigma), 2)
+        mu = torch.cat(list(map(lambda x: x.unsqueeze(2), mu)), 2)
+        sigma = torch.cat(list(map(lambda x: x.unsqueeze(2), sigma)), 2)
         sigma = torch.clamp(sigma, min=1e-6)
 
         return alpha, mu, sigma
@@ -225,7 +225,7 @@ class ConditionalRealValueMADE(AbstractConditionalMADE):
             randvals = randvals.cuda()
             gumbel = gumbel.cuda()
 
-        for d in xrange(self.D_out):
+        for d in range(self.D_out):
             full_input = torch.cat((parents, latent), 1)
             alpha, mu, sigma = self(full_input)
             _, z = torch.max(alpha.log() + gumbel, 2, keepdim=False)

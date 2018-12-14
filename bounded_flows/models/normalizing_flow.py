@@ -23,7 +23,7 @@ class NormalizingFlow(nn.Module):
             self.dimension = dimension
         else :
             self.dimension = 1
-            
+
         # Setup the transformations:
         self.transform_layers =  nn.ModuleList([TransformLayer(dimension, transform_params[k]) for k in range(num_layers)])
         self.output_layer = SupportTransformLayer(support_transform, bounds=support_bounds)
@@ -78,7 +78,6 @@ class SupportTransformLayer(nn.Module):
             self.inverse_transform = ST.r_plus_inverse_transform
         elif support_transform == 'r-bounded':
             c, b = bounds
-            # TODO: Support bounds over only a subset of the dimensions.
             self.transform = partial(ST.r_bounded_transform, c=c, b=b)
             self.log_det_jac_fn = partial(ST.r_bounded_log_det_jac, c=c, b=b)
             self.inverse_transform = partial(ST.r_bounded_inverse_transform, c=c, b=b)
@@ -120,22 +119,26 @@ class CouplingTransformLayer(nn.Module):
         # register the parameters of the scale and shift
         # operaters. This ensures that fitting the coupling layer
         # fits the parameterizing functions.
-        for i, param in enumerate(s_fn.parameters()):
-            self.register_parameter("s_fn_" + str(i), param)
 
-        for i, param in enumerate(t_fn.parameters()):
-            self.register_parameter("t_fn_" + str(i), param)
+        self.add_module("s_fn", s_fn)
+        self.add_module("t_fn", t_fn)
+
+        # for i, param in enumerate(s_fn.parameters()):
+        #     self.register_parameter("s_fn_" + str(i), param)
+        #
+        # for i, param in enumerate(t_fn.parameters()):
+        #     self.register_parameter("t_fn_" + str(i), param)
 
 
     def forward(self, z, log_prob):
-        y = FT.coupling_transform(z, self.mask, self.s_fn, self.t_fn)
-        log_prob = log_prob - FT.coupling_log_det_jac(z, self.mask, self.s_fn, self.t_fn)
+        y = FT.coupling_inverse_transform(z, self.mask, self.s_fn, self.t_fn)
+        log_prob = log_prob + FT.coupling_log_det_jac(z, self.mask, self.s_fn, self.t_fn)
 
         return y, log_prob
 
     def inverse(self, y, log_prob):
-        z = FT.coupling_inverse_transform(y, self.mask, self.s_fn, self.t_fn)
-        log_prob = log_prob - FT.coupling_log_det_jac(z, self.mask, self.s_fn, self.t_fn)
+        z = FT.coupling_transform(y, self.mask, self.s_fn, self.t_fn)
+        log_prob = log_prob + FT.coupling_log_det_jac(z, self.mask, self.s_fn, self.t_fn)
 
         return z, log_prob
 

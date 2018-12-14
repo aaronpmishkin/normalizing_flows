@@ -29,23 +29,14 @@ def identity_log_det_jac(z):
 # R PLUS
 
 def r_plus_transform(z):
-    """An invertible transformation from R^N -> R^N_+ defined using the softplus function
-        y = log(1 + exp(z))
-    """
-    # TODO: Investigate whether or not the function is properly invertible if it uses a linear approximation above 'threshold'.
-    return F.softplus(z, beta=1, threshold=math.inf)
+    return torch.exp(z)
 
 def r_plus_inverse_transform(y):
-    """Inverse of r_plus_transform. This is only defined for y >= 0.
-        z = log(exp(y) - 1)
-    """
-    return torch.log(torch.exp(y) - 1)
+    z = torch.log(y)
+    return z
 
 def r_plus_log_det_jac(z):
-    """Log-determinant of the Jacobian of the r_plus_transform. This is identical to the log-determinant of the softplus function.
-        log(det J(z)) = sum(log(sigma(z)))
-    """
-    log_det = torch.sum(F.logsigmoid(z), dim=1)
+    log_det = torch.sum(z , dim=1)
     return log_det
 
 # R BOUNDED
@@ -54,7 +45,7 @@ def r_bounded_transform(z, c, b):
     """An invertible transformation from R^N -> A, where A is a rectangular region of R^N given by
             A := { y | c <= y <= b }
        This is achieved using the sigmoid function as
-            y = b * sigma(z) + c
+            y = b * sigmoid(z) + c
    """
 
     return F.sigmoid(z).mul(b) + c
@@ -68,7 +59,7 @@ def r_bounded_log_det_jac(z, c, b):
     """Log-determinant of the Jacobian of the r_bounded_transform. This is the log-determinant of the softplus function with a scaling factor.
     """
 
-    log_det = torch.sum(torch.log(torch.abs(b)) - z - 2 * torch.softplus(-z, beta=1, threshold=math.inf), dim=1)
+    log_det = torch.sum(torch.log(torch.abs(b)) - z - 2 * F.softplus(-z, beta=1, threshold=math.inf), dim=1)
     return log_det
 
 # PROBABILITY SIMPLEX

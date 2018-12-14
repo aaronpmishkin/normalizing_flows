@@ -17,8 +17,13 @@ import seaborn as sns
 # Import our model:
 from bounded_flows.models.real_nvp import conditional_real_nvp_flow
 
-# Helper function:
+import pickle
 
+# set the seeds for reproducibility.
+np.random.seed(12)
+torch.manual_seed(12)
+
+# Helper functions:
 def systematic_resample(log_weights):
     A = log_weights.max()
     normalizer = np.log(np.exp(log_weights - A).sum()) + A
@@ -129,8 +134,7 @@ M_train = pymc.Model(robust_regression(None, None))
 gen_data = lambda num_samples: generate_synthetic(M_train, num_samples)
 example_minibatch = gen_data(100)
 
-# This is where we insert our real_nvp model:
-
+# Define Normalizing flow with real NVP layers:
 observed_dim = num_points*2
 latent_dim = 3
 
@@ -221,14 +225,14 @@ def compare_and_plot(ns=100, alpha=0.05, data_x=None, data_y=None, true_w=None):
     plt.plot(data_x[:,1], data_y, "k.")
     plt.xlim(np.min(domain),np.max(domain))
     limy = plt.ylim()
-    plt.legend(["MH posterior"])
+    plt.legend(["Metropolis-Hastings Posterior"])
 
     ax = plt.subplot(143)
     plt.plot(domain, nn_mean[0] + nn_mean[1]*domain + nn_mean[2]*domain**2, "r--")
     for i in range(ns):
         plt.plot(domain, nn_proposals[i,0] + nn_proposals[i,1]*domain  + nn_proposals[i,2]*domain**2, "r-", alpha=alpha)
     plt.plot(data_x[:,1], data_y, "k.")
-    plt.legend(["NN proposal"])
+    plt.legend(["Normalizing Flow (NF) Proposal"])
     plt.ylim(limy)
     plt.xlim(min(domain),max(domain));
     ax.yaxis.set_ticklabels([])
@@ -268,7 +272,7 @@ def compare_and_plot(ns=100, alpha=0.05, data_x=None, data_y=None, true_w=None):
     for i in range(ns):
         plt.plot(domain, nn_resampled[i,0] + nn_resampled[i,1]*domain  + nn_resampled[i,2]*domain**2, "g-", alpha=alpha)
     plt.plot(data_x[:,1], data_y, "k.")
-    plt.legend(["NN-IS posterior"])
+    plt.legend(["NF Importance Sampling Posterior"])
     plt.ylim(limy)
     plt.xlim(min(domain),max(domain));
     ax.yaxis.set_ticklabels([])
@@ -276,6 +280,12 @@ def compare_and_plot(ns=100, alpha=0.05, data_x=None, data_y=None, true_w=None):
     plt.tight_layout()
 
 
+# save the model
+pickle_out = open("conditional_density_est.pkl","wb")
+pickle.dump(flow_model, pickle_out)
+pickle_out.close()
+
+# generate four different plots.
 compare_and_plot();
 compare_and_plot();
 compare_and_plot();

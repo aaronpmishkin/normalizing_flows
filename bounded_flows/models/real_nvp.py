@@ -18,9 +18,11 @@ from    torch.nn.utils                                                          
 
 
 # Helper function for instatiating normalizing flows with real NVP transformation layers.
-def real_nvp_flow(D, flow_layers, nn_layers, nn_act_func, support_transform="r", support_bounds=None):
+def real_nvp_flow(D, flow_layers, nn_layers, nn_act_func, support_transform="r", support_bounds=None, base_dist_loc=None):
     """ Instantiate a real NVP flow with scale and shift functions given by neural networks. """
-    initial_dist = torch.distributions.MultivariateNormal(torch.zeros(D), torch.eye(D))
+    if base_dist_loc is None:
+        base_dist_loc = torch.zeros(D)
+    initial_dist = torch.distributions.MultivariateNormal(base_dist_loc, torch.eye(D))
 
     params = []
 
@@ -83,6 +85,10 @@ def conditional_real_nvp_flow(D_y, D_x, flow_layers, nn_layers, nn_act_func, sup
 
 def random_mask(D):
     """ Generate a random mask """
+
+    if D == 1:
+        return torch.zeros(D)
+
     mask = torch.ones(D)
     index = torch.randperm(D-1)[0] + 1
     direction = torch.distributions.Bernoulli(torch.tensor([0.5])).sample()
